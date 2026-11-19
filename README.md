@@ -15,6 +15,7 @@ This repository holds only the app. Your books never come here. They live as pla
 - **History:** a rolling list of earlier versions of each scene. Any version can be restored.
 - **Sealed versions:** a seal is a copy of a chapter or the whole book that nothing changes. Each file has a fingerprint you can check, and you can start a new draft from a seal.
 - **Safe editing with Claude:** when a scene file changes outside the Desk, the page picks up the new version. If you also have unsaved changes, you choose which version to keep, and the other goes into History.
+- **Lamp Room link:** a new book can be added to the Lamp Room at the same time, and Lamp Room books can be opened in the Desk. The Desk only adds new book folders to the Lamp Room library; it never changes a Lamp Room book that already exists.
 - **Backup:** saves the whole library as one .zip.
 
 ## Built like the Lamp Room

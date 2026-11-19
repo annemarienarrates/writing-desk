@@ -115,3 +115,8 @@ body.on-desk main { max-width: none; padding: 0; }
 .dfs { opacity: .55; }
 .wrow { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
 .bad { color: var(--bad); }
+
+/* Lamp Room link */
+.lamp-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.lampbook { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 0; }
+.lampbox { margin: 10px 0; }
