@@ -271,3 +271,13 @@ body.on-shelf .shelf-row:has(.lampspine) { --row: 385px; }
 .penbox { border-bottom: 1px solid var(--line); padding: 8px 0; }
 .penbox summary { cursor: pointer; }
 .penbox textarea { min-height: 80px; }
+/* publishing kit */
+.kf { padding: 8px 0; border-top: 1px solid var(--line); }
+.kl { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 4px; }
+.kl span.small { flex: 1; }
+.kl .btn { flex: none; margin-left: auto; }
+.kf input, .kf textarea, .kf select { width: 100%; }
+.kli { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+.kli input { flex: 1; }
+.cnt { font: 11px var(--mono); color: var(--muted); }
+.cnt.over { color: var(--bad, #b3261e); font-weight: 700; }

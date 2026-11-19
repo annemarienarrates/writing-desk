@@ -585,7 +585,7 @@
   function renderRail() {
     const book = E.book, el = $("#rail"); if (!book || !el) return;
     const cur = Forge.current(book);
-    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><button data-ft="build" class="${forgeTab === "build" ? "on" : ""}">📖 Build</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
+    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><button data-ft="build" class="${forgeTab === "build" ? "on" : ""}">📖 Build</button><button data-ft="kit" class="${forgeTab === "kit" ? "on" : ""}">🏷 Kit</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
       const done = Forge.isDone(book, s.key), blocked = !done && Forge.blockedBy(book, s.key);
       return `<button data-ft="${s.key}" class="${forgeTab === s.key ? "on" : ""} ${done ? "done" : s.key === cur ? "cur" : ""} ${blocked ? "blocked" : ""}" title="${done ? "Done" : s.key === cur ? "You are here" : blocked ? "Not ready: " + esc(blocked.item[1]) + " (" + blocked.stage.label + ")" : ""}">${done ? "✓ " : s.key === cur ? "● " : ""}${s.label}</button>`;
     }).join("");
@@ -596,8 +596,8 @@
     $("#ms-page").classList.toggle("hidden", on); $("#counts").classList.toggle("hidden", on);
     $$(".deskbar .btn").forEach(b => b.classList.toggle("hidden", on && b.id !== "tgp"));
     fv.classList.toggle("hidden", !on);
-    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : forgeTab === "build" ? "Book Build" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
-    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (forgeTab === "build") guard(renderBuild)(); else if (on) renderForge();
+    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : forgeTab === "build" ? "Book Build" : forgeTab === "kit" ? "Publishing kit" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
+    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (forgeTab === "build") guard(renderBuild)(); else if (forgeTab === "kit") guard(renderKit)(); else if (on) renderForge();
   }
   async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Copied. Paste it into the series' Claude Project chat."); } catch (e) { toast("Couldn't copy: select the text and copy it by hand."); } }
   function renderForge() {
@@ -883,6 +883,68 @@
         await Store.saveExport(book, name, blob);
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
         toast(`${name}: saved in Exports and downloaded.`, 5000);
+      } finally { b.disabled = false; }
+    }));
+  }
+
+  // ---------- the publishing kit ----------
+  async function renderKit() {
+    const book = E.book, fv = $("#forgeview"), K = book.kit = book.kit || {};
+    if (!K.title) K.title = book.title;
+    const field = ([k, label, kind, lim, hint]) => {
+      const v = K[k], copy = `<button class="btn small quiet" data-copy="${k}" title="Copy">Copy</button>`;
+      if (kind === "list") { const arr = Array.isArray(v) ? v : []; return `<div class="kf"><div class="kl"><b>${esc(label)}</b>${hint ? `<span class="small muted">${esc(hint)}</span>` : ""}</div>${Array.from({ length: lim }, (_, i) => `<div class="kli"><span class="muted small">${i + 1}</span><input data-k="${k}" data-i="${i}" value="${esc(arr[i] || "")}">${k === "keywords" ? `<span class="cnt" data-cnt="${k}.${i}"></span>` : ""}<button class="btn small quiet" data-copy="${k}" data-ci="${i}">Copy</button></div>`).join("")}</div>`; }
+      if (kind === "select") return `<div class="kf"><div class="kl"><b>${esc(label)}</b>${hint ? `<span class="small muted">${esc(hint)}</span>` : ""}</div><select data-k="${k}">${lim.map(o => `<option ${v === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`;
+      if (kind === "date") return `<div class="kf"><div class="kl"><b>${esc(label)}</b></div><input type="date" data-k="${k}" value="${esc(v || "")}"></div>`;
+      return `<div class="kf"><div class="kl"><b>${esc(label)}</b>${hint ? `<span class="small muted">${esc(hint)}</span>` : ""}<span class="cnt" data-cnt="${k}"></span>${copy}</div>${kind === "text" ? `<textarea data-k="${k}" rows="${k === "blurb" ? 9 : 4}">${esc(v || "")}</textarea>` : `<input data-k="${k}" value="${esc(v || "")}">`}</div>`;
+    };
+    const arcs = book.arcs = book.arcs || [];
+    fv.innerHTML = `<div class="fv-head"><h2>Publishing kit</h2><span class="muted small">Everything the store forms ask for, kept with the book</span></div>
+      <div class="card"><b>Let Claude write it.</b> <span class="small">Copy the prompt into the series' Claude Project, then paste the whole reply below: each heading fills its field. Anything already typed here is only replaced by the headings Claude sent.</span>
+        <div class="row"><button class="btn small" id="kprompt">Copy the kit prompt</button><button class="btn small" id="kpaste">Paste Claude's kit…</button><span class="spacer"></span><button class="btn small quiet" id="ksave">Save the kit as Markdown</button></div></div>
+      ${Kit.GROUPS.map(([g, fs]) => `<details class="csec" open><summary><b>${esc(g)}</b></summary>${fs.map(field).join("")}</details>`).join("")}
+      <details class="csec" open><summary><b>Advance reader copies</b> <span class="badge">${arcs.length}</span></summary>
+        <p class="small muted">Each reader gets their own EPUB with their name on the title page and after every chapter, so a leaked copy can be traced. It uses the look chosen in 📖 Build (${buildLook === "steel" ? "Steel" : "Filigree"}).</p>
+        <table class="ctable">${arcs.map((a, i) => `<tr><td><b>${esc(a.name)}</b></td><td class="small">${a.sent ? "made " + esc(a.sent) : ""}</td><td><label class="check small"><input type="checkbox" data-arcrev="${i}" ${a.reviewed ? "checked" : ""}> reviewed</label></td><td><input class="small" data-arcnote="${i}" value="${esc(a.note || "")}" placeholder="note, review link"></td><td><button class="btn small" data-arcmake="${i}">EPUB</button><button class="btn small quiet" data-arcdel="${i}">✕</button></td></tr>`).join("")}</table>
+        <form class="row" id="arcadd"><input id="arcname" placeholder="Reader's name"><button class="btn small">Add reader</button></form></details>`;
+    const save = guard(async () => { await Store.saveBook(book); });
+    let t = 0; const later = () => { clearTimeout(t); t = setTimeout(save, 600); };
+    const counts = () => {
+      for (const el of $$("[data-cnt]", fv)) {
+        const [k, i] = el.dataset.cnt.split("."), v = i != null ? ((K[k] || [])[+i] || "") : (K[k] || "");
+        const lim = k === "keywords" ? 50 : k === "blurb" ? 4000 : (k === "title" || k === "subtitle") ? 200 : 0;
+        const n = k === "title" || k === "subtitle" ? (K.title || "").length + (K.subtitle || "").length : String(v).length;
+        el.textContent = lim ? `${n}/${lim}${k === "title" || k === "subtitle" ? " with " + (k === "title" ? "subtitle" : "title") : ""}` : "";
+        el.classList.toggle("over", !!lim && n > lim);
+      }
+    };
+    counts();
+    $$("[data-k]", fv).forEach(x => x.oninput = x.onchange = () => {
+      const k = x.dataset.k;
+      if (x.dataset.i != null) { const a = Array.isArray(K[k]) ? K[k] : []; a[+x.dataset.i] = x.value; K[k] = a; } else K[k] = x.value;
+      counts(); later();
+    });
+    $$("[data-copy]", fv).forEach(b => b.onclick = () => { const k = b.dataset.copy, v = b.dataset.ci != null ? ((K[k] || [])[+b.dataset.ci] || "") : Array.isArray(K[k]) ? K[k].filter(Boolean).join("\n") : (K[k] || ""); navigator.clipboard.writeText(v).then(() => toast("Copied."), () => toast("Couldn't copy.")); });
+    $("#kprompt").onclick = () => copyText(Kit.prompt(book));
+    $("#kpaste").onclick = guard(async () => {
+      const md = await modal(`<h2>Paste Claude's kit</h2><textarea id="kmd" class="packtext" placeholder="Paste the whole reply here" autofocus></textarea><div class="row end"><button class="btn quiet" data-close>Cancel</button><button class="btn primary" id="kgo">Fill in the kit</button></div>`, { wide: true, mount: (d, close) => { $("#kgo", d).onclick = () => close($("#kmd", d).value); } });
+      if (!md) return;
+      const got = Kit.parse(md), n = Object.keys(got).length;
+      if (!n) { toast("No headings matched. Use the kit prompt so Claude sends the right headings."); return; }
+      Object.assign(K, got); await save(); toast(`Filled ${n} field${n === 1 ? "" : "s"}.`); renderKit();
+    });
+    $("#ksave").onclick = guard(async () => { const name = `${Store.safe(book.title)} - Publishing Kit.md`; await Store.saveExport(book, name, Kit.toMarkdown(book)); await Store.addReference(book, "publishing-kit.md", Kit.toMarkdown(book)); toast(`Saved in Exports, and on the reference shelf as publishing-kit.md.`); });
+    $("#arcadd").onsubmit = guard(async e => { e.preventDefault(); const n = $("#arcname").value.trim(); if (!n) return; arcs.push({ name: n }); await save(); renderKit(); });
+    $$("[data-arcdel]", fv).forEach(b => b.onclick = guard(async () => { arcs.splice(+b.dataset.arcdel, 1); await save(); renderKit(); }));
+    $$("[data-arcrev]", fv).forEach(c => c.onchange = guard(async () => { arcs[+c.dataset.arcrev].reviewed = c.checked; await save(); }));
+    $$("[data-arcnote]", fv).forEach(c => c.oninput = () => { arcs[+c.dataset.arcnote].note = c.value; later(); });
+    $$("[data-arcmake]", fv).forEach(b => b.onclick = guard(async () => {
+      const a = arcs[+b.dataset.arcmake]; b.disabled = true; toast("Building " + a.name + "'s copy…");
+      try {
+        const blob = await Build.epub(book, buildLook, a.name), name = `${Store.safe(book.title)} - ARC for ${Store.safe(a.name)}.epub`;
+        await Store.saveExport(book, name, blob); a.sent = Store.today(); await save();
+        const l = document.createElement("a"); l.href = URL.createObjectURL(blob); l.download = name; document.body.appendChild(l); l.click(); l.remove();
+        toast(`${name}: saved in Exports and downloaded.`); renderKit();
       } finally { b.disabled = false; }
     }));
   }

@@ -127,7 +127,8 @@ hr.brk{border:0;border-top:1px solid #888;width:20%;margin:1.6em auto;}
 .copyright p{font-size:.8em;text-align:left;}
 .cover{text-align:center;margin:0;padding:0;}
 .cover img{max-width:100%;max-height:100%;}
-nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;}nav a{text-decoration:none;color:inherit;}`,
+nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;}nav a{text-decoration:none;color:inherit;}
+.arc{margin-top:3em;font-size:.8em;text-indent:0;}.arcmark{text-align:center;text-indent:0;font-size:.7em;color:#888;margin-top:2em;}`,
     filigree: `body{margin:0 6%;font-family:Georgia,"Palatino Linotype",Palatino,serif;line-height:1.55;text-align:justify;}
 p{margin:0;text-indent:1.5em;}
 p.first,.scene>p:first-child,.matter p,hr.brk+p,p.brk+p{text-indent:0;}
@@ -146,7 +147,8 @@ p.brk{text-align:center;text-indent:0;margin:1.2em 0;color:#5a4636;letter-spacin
 .copyright p{font-size:.8em;text-align:left;}
 .cover{text-align:center;margin:0;padding:0;}
 .cover img{max-width:100%;max-height:100%;}
-nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;font-style:italic;}nav a{text-decoration:none;color:inherit;}`
+nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;font-style:italic;}nav a{text-decoration:none;color:inherit;}
+.arc{margin-top:3em;font-size:.8em;text-indent:0;font-variant:normal;letter-spacing:0;}.arcmark{text-align:center;text-indent:0;font-size:.7em;color:#888;margin-top:2em;}`
   };
   // the opening of a chapter: Filigree gets a drop cap and small-caps lead-in
   function opener(md, look) {
@@ -160,21 +162,23 @@ nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;font-style:itali
     h += r.slice(1).map(x => { let s = X(x.t); if (x.i) s = `<em>${s}</em>`; if (x.b) s = `<strong>${s}</strong>`; return s; }).join("");
     return `<p class="first">${h}</p>`;
   }
-  function body(p, book, look) {
+  function body(p, book, look, arc) {
     const brk = look === "filigree" ? `<p class="brk">❦</p>` : `<hr class="brk"/>`;
     if (p.kind === "chapter") {
       const head = `<h1>${p.label ? `<span class="label">${X(p.label)}</span>` : ""}${X(p.sub)}</h1>${look === "filigree" ? `<p class="orn"><img src="orn.svg" alt=""/></p>` : ""}`;
-      return `<section epub:type="chapter" role="doc-chapter">${head}${p.scenes.map((sc, i) => `<div class="scene">${sc.map((md, j) => BREAK.test(md) ? brk : i === 0 && j === 0 ? opener(md, look) : `<p>${inlineX(md)}</p>`).join("")}</div>`).join(brk)}</section>`;
+      return `<section epub:type="chapter" role="doc-chapter">${head}${p.scenes.map((sc, i) => `<div class="scene">${sc.map((md, j) => BREAK.test(md) ? brk : i === 0 && j === 0 ? opener(md, look) : `<p>${inlineX(md)}</p>`).join("")}</div>`).join(brk)}${arc ? `<p class="arcmark">Advance reader copy for ${X(arc)}</p>` : ""}</section>`;
     }
-    if (p.id === "title") return `<section epub:type="titlepage" class="title-page"><p class="t">${X(book.title)}</p>${book.series ? `<p class="s">${X(book.series)}${book.seriesNo ? `, Book ${X(book.seriesNo)}` : ""}</p>` : ""}<p class="a">${X(book.penName || book.writer || "")}</p></section>`;
+    if (p.id === "title") return `<section epub:type="titlepage" class="title-page"><p class="t">${X(book.title)}</p>${book.series ? `<p class="s">${X(book.series)}${book.seriesNo ? `, Book ${X(book.seriesNo)}` : ""}</p>` : ""}<p class="a">${X(book.penName || book.writer || "")}</p>${arc ? `<p class="arc">Advance reader copy for <b>${X(arc)}</b>. Please don't share or upload it.</p>` : ""}</section>`;
     const type = { copyright: "copyright-page", about: "appendix", alsoby: "appendix" }[p.id] || (p.kind === "front" ? "preface" : "appendix");
     return `<section epub:type="${type}" class="matter ${p.id === "copyright" ? "copyright" : ""}">${p.id === "copyright" ? "" : `<h1>${X(p.title)}</h1>`}${p.paras.map(md => `<p>${inlineX(md)}</p>`).join("")}</section>`;
   }
   const page = (title, inner, extraNs) => `<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en"${extraNs || ""}>\n<head><meta charset="utf-8"/><title>${X(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head>\n<body>${inner}</body>\n</html>\n`;
 
   // ---------- EPUB 3 ----------
-  async function epub(book, look) {
-    const ps = await pieces(book, { dropLove: true }), zip = new JSZip(), id = "urn:uuid:" + (book.epubId || (book.epubId = crypto.randomUUID()));
+  // arc: a reader's name for a watermarked advance copy (its own identifier, the name on the title page and after every chapter)
+  async function epub(book, look, arc) {
+    const ps = await pieces(book, { dropLove: true }), zip = new JSZip(), id = "urn:uuid:" + (arc ? crypto.randomUUID() : (book.epubId || (book.epubId = crypto.randomUUID())));
+    if (arc && !ps.some(p => p.id === "title")) ps.unshift({ id: "title", kind: "front", title: book.title, paras: [] });
     zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
     zip.file("META-INF/container.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>\n`);
     zip.file("OEBPS/style.css", CSS[look]);
@@ -192,7 +196,7 @@ nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;font-style:itali
     let navPlaced = false;
     for (const p of ps) {
       if (!navPlaced && p.kind !== "front") { spine.push(`<itemref idref="nav"/>`); navPlaced = true; }   // the contents page, after the front matter
-      zip.file(`OEBPS/${p.id}.xhtml`, page(p.title, body(p, book, look)));
+      zip.file(`OEBPS/${p.id}.xhtml`, page(p.title, body(p, book, look, arc)));
       items.push(`<item id="${p.id}" href="${p.id}.xhtml" media-type="application/xhtml+xml"${look === "filigree" && p.kind === "chapter" ? "" : ""}/>`);
       spine.push(`<itemref idref="${p.id}"/>`);
     }
@@ -210,7 +214,7 @@ nav ol{list-style:none;padding:0;margin:0;}nav li{margin:.5em 0;font-style:itali
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="en">
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
 <dc:identifier id="bookid">${id}</dc:identifier>
-<dc:title>${X(book.title)}</dc:title>
+<dc:title>${X(book.title)}${arc ? " (Advance Reader Copy)" : ""}</dc:title>
 <dc:creator>${X(book.penName || book.writer || "")}</dc:creator>
 <dc:language>en</dc:language>
 <meta property="dcterms:modified">${modified}</meta>
