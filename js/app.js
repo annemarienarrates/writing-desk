@@ -259,12 +259,14 @@
           <div class="meta"><b>${esc(t.name)}</b><span>${t.series ? esc(t.series) + (t.seriesNo != null ? " #" + esc(t.seriesNo) : "") : "Standalone"}</span><button class="btn small" data-bring="${esc(t.id)}">Open in the Writing Desk</button></div></div>`).join("")}</div></section>` : ""}
       ${Lamp.state === "needs-permission" ? `<div class="card hint">Your Lamp Room writing projects can show up here too. <a href="#" data-lampconnect>Connect the Lamp Room library</a> (Chrome asks once).</div>` : ""}`;
     $$("[data-bring]").forEach(b => b.onclick = guard(() => bringFromLamp(Lamp.byId(b.dataset.bring))));
-    for (const el of $$("[data-lcov]")) { const blob = await Lamp.coverBlob(el.dataset.lcov); if (blob) { el.style.backgroundImage = `url("${URL.createObjectURL(blob)}")`; el.classList.add("img"); } }
+    for (const el of $$("[data-lcov]")) { const blob = await Lamp.coverBlob(el.dataset.lcov); if (blob) { el.classList.add("img"); el.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`; } }
     wireLampConnect(main);
     const setF = (k, v) => { f[k] = v; localStorage.setItem("wd-shelf", JSON.stringify(f)); viewShelf(); };
     $("#fpen") && ($("#fpen").onchange = e => setF("pen", e.target.value));
     $("#fwr") && ($("#fwr").onchange = e => setF("writer", e.target.value));
-    for (const el of $$(".spine")) { const b = Store.byFolder(el.dataset.f); const u = b && await Store.coverUrl(b); if (u) { const c = $(".cov", el); c.style.backgroundImage = `url("${u}")`; c.classList.add("img"); } }
+    // covers are shown whole (never cropped), standing on the shelf
+    const showCover = (c, u) => { c.classList.add("img"); c.innerHTML = `<img src="${u}" alt="">`; };
+    for (const el of $$(".spine[data-f]")) { const b = Store.byFolder(el.dataset.f); const u = b && await Store.coverUrl(b); if (u) showCover($(".cov", el), u); }
   }
 
   // ---------- new book: fresh or imported ----------
