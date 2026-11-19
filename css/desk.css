@@ -225,3 +225,23 @@ body.on-shelf .spine .meta .muted { color: color-mix(in srgb, var(--label) 65%, 
 body.on-shelf .lampspine .meta .btn { margin-top: 4px; }
 body.on-shelf .hint, body.on-shelf .empty { position: relative; z-index: 1; }
 body.on-shelf .shelf-row:has(.lampspine) { --row: 345px; }
+/* stats above the stages */
+.statbar { display: flex; gap: 0; padding: 8px 12px; background: var(--panel2); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.statbar .st { display: flex; flex-direction: column; min-width: 120px; padding: 0 12px; border-right: 1px solid var(--line); }
+.statbar .st:last-child { border-right: 0; margin-left: auto; justify-content: center; }
+.statbar .st span { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); white-space: nowrap; }
+.statbar .st b { font: 600 18px var(--serif); color: var(--ink); line-height: 1.2; }
+.statbar .st em { font: 11.5px var(--sans); font-style: normal; color: var(--muted); white-space: nowrap; }
+.statbar .bar { display: block; height: 4px; background: var(--line); border-radius: 2px; margin: 3px 0 2px; overflow: hidden; }
+.statbar .bar i { display: block; height: 100%; background: var(--accent); }
+.desk .paper { scroll-padding-top: 120px; }
+.tline input.tday { width: 64px; }
+.tline tr.tch td { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 14px; }
+.tline tr.warnrow td:first-child { border-left: 3px solid var(--bad, #b3261e); }
+.hint-chip { display: inline-block; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 0 7px; margin: 1px; }
+.cont { margin: 14px 0; }
+.deskhead { position: sticky; top: 0; z-index: 4; background: var(--bg); }
+.deskhead .rail, .deskhead .deskbar { position: static; }
+.statbar .st { flex: 1 1 0; min-width: 92px; padding: 0 10px; overflow: hidden; }
+.statbar .st span, .statbar .st em { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statbar .st.sprint { flex: 0 0 auto; min-width: 0; }

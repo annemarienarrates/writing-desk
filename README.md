@@ -21,6 +21,10 @@ This repository holds only the app. Your books never come here. They live as pla
 - **Style check:** runs on this computer, with no AI and no internet, on a scene, a chapter or the whole book. It looks for AI tells (in narration only), overused words, echoes, repeated phrases, sentences that start the same way, pacing and readability by chapter, long paragraphs and sentences, dialogue tags (fancy tags, non-speech tags, adverbs on tags), em-dashes, "not X but Y", passive voice and filter words, plus the genre pack's budgets. "Show" lights up the spot on the page.
 - **People & places:** names are suggested from the bible on the reference shelf and from the manuscript, and one click keeps them; there are no codex entries to write. A chapter-by-chapter grid shows who turns up where, and who has gone missing. The side panel's Cast tab shows who's in the open scene.
 - **Genre packs:** master packs for Harem LitRPG, Reverse Harem Romance, Space Opera and Dark Fantasy live in the library's `Genre Packs` folder. Each has its own checker extras (tells, budgets, ignored lines). A book's genre decides which pack the checker uses.
+- **Stats above the stages:** the book's words (and its target), words written this month, the writer's month against their monthly goal, words per month, the average book speed of finished books, and the writing pace. Words count when they land in the files, from the Desk or from Claude; imported text isn't counted as written.
+- **Sprints:** a timer that counts the words added. At the end you can make the result your writing pace (shared with the Lamp Room) or add the time to today's Lamp Room log.
+- **Timeline:** a day and time for every scene, filled in from time words in the text ("the next morning", "three days later", weekdays). It flags days that go backwards, jumps that don't match the text, and weekdays that don't match the dates.
+- **Continuity:** eye colour, hair colour and ages that disagree between chapters and the bible (in People & places).
 - **Backup:** saves the whole library as one .zip.
 
 ## Built like the Lamp Room

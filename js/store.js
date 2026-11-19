@@ -218,6 +218,7 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       });
       return L.join("\n");
     },
+    monthWords(book, ym) { let n = 0; for (const [d, w] of Object.entries(book.wordLog || {})) if (d.startsWith(ym)) n += w; return n; },
     bookWords(book) { return book.chapters.reduce((a, c) => a + this.chapterWords(c), 0); },
     chapterWords(ch) { return ch.scenes.reduce((a, s) => a + (s.words || 0), 0); },
     openLove(book) { const out = []; for (const c of book.chapters) for (const s of c.scenes) if (s.love) out.push({ ch: c, sc: s }); return out; },
@@ -256,7 +257,10 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       catch (e) { return 0; }
     },
     changedOutside(book, ch, sc, modified) { const seen = this._seen[this.scenePath(book, ch, sc)]; return seen != null && modified && modified !== seen; },
-    async writeScene(book, ch, sc, text, force) {
+    // words written, per day, per book: book.wordLog = { "2026-11-19": 1234 } (net: cuts count against the day)
+    today() { const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; },
+    logWords(book, delta) { if (!delta) return; book.wordLog = book.wordLog || {}; const k = this.today(); book.wordLog[k] = (book.wordLog[k] || 0) + delta; },
+    async writeScene(book, ch, sc, text, force, noLog) {
       const cd = await this.chapterDir(book, ch), path = this.scenePath(book, ch, sc);
       if (!force) {
         const now = await this.peekScene(book, ch, sc);
@@ -264,7 +268,7 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       }
       this._seen[path] = await writeFile(cd, sc.file, text);
       const w = words(text), love = LOVE.test(text);
-      if (w !== sc.words || love !== !!sc.love) { sc.words = w; sc.love = love; await this.saveBook(book); }
+      if (w !== sc.words || love !== !!sc.love) { if (!noLog) this.logWords(book, w - (sc.words || 0)); sc.words = w; sc.love = love; await this.saveBook(book); }
     },
     async renameScene(book, ch, sc, title) {
       title = String(title || "").trim() || "Scene";
@@ -393,7 +397,7 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       for (const f of seal.files || []) {
         const hit = this.find(book, f.sceneId); const t = await this.readSealed(book, seal, f.path);
         if (t == null) { missing++; continue; }
-        if (hit) { const cur = (await this.readScene(book, hit.ch, hit.sc)).text; await this.snapshot(book, hit.sc, cur, "before draft from seal"); await this.writeScene(book, hit.ch, hit.sc, t, true); n++; }
+        if (hit) { const cur = (await this.readScene(book, hit.ch, hit.sc)).text; await this.snapshot(book, hit.sc, cur, "before draft from seal"); await this.writeScene(book, hit.ch, hit.sc, t, true, true); n++; }
         else {
           let ch = book.chapters.find(c => c.id === f.chapterId) || book.chapters.find(c => c.title === f.chapter);
           if (!ch) ch = await this.addChapter(book, f.chapter);

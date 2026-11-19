@@ -70,7 +70,14 @@
 
   const Forge = {
     STAGES,
-    state(book) { book.forge = book.forge || { done: {}, checks: {} }; book.forge.done = book.forge.done || {}; book.forge.checks = book.forge.checks || {}; return book.forge; },
+    state(book) { book.forge = book.forge || { done: {}, checks: {} }; book.forge.done = book.forge.done || {}; book.forge.checks = book.forge.checks || {}; book.forge.doneAt = book.forge.doneAt || {}; return book.forge; },
+    // started → finished: the book's own dates if set, else when it was made and when its last stage was done
+    span(book) {
+      const st = this.state(book), start = book.started || (book.created || "").slice(0, 10);
+      const all = STAGES.every(x => st.done[x.key]);
+      const finish = book.finished || (all ? Object.values(st.doneAt).sort().pop() || null : null);
+      return { start, finish, all: !!finish };
+    },
     isDone(book, key) { return !!this.state(book).done[key]; },
     checked(book, key, id) { return !!this.state(book).checks[key + "." + id]; },
     current(book) { const s = STAGES.find(x => !this.isDone(book, x.key)); return s ? s.key : null; },
@@ -92,6 +99,9 @@
         if (!s.lamp) continue;
         const ls = (title.stages || []).find(x => x.id === "a-" + s.lamp); if (!ls) continue;
         if (!!ls.done !== !!st.done[s.key]) { st.done[s.key] = !!ls.done; changed = true; }
+        st.doneAt = st.doneAt || {};
+        if (ls.done && ls.doneDate && st.doneAt[s.key] !== ls.doneDate) { st.doneAt[s.key] = ls.doneDate; changed = true; }
+        if (!ls.done && st.doneAt[s.key]) { delete st.doneAt[s.key]; changed = true; }
       }
       // a book past outlining in the Lamp Room is past setup too
       if (st.done.outline && !st.done.setup) { st.done.setup = true; changed = true; }

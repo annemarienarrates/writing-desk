@@ -61,4 +61,58 @@
     return res;
   }
   window.Cast = { suggest, count, fromBible, fromText };
+
+  // ---------- continuity: eyes, hair and ages that don't agree ----------
+  const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100 };
+  const numOf = w => { w = String(w).toLowerCase(); if (/^\d+$/.test(w)) return +w; const p = w.split(/[- ]/); let n = 0; for (const x of p) { if (NUM[x] == null) return null; n += NUM[x]; } return n || null; };
+  const EYE = "green|blue|grey|gray|brown|hazel|amber|black|violet|purple|gold|golden|silver|dark|pale|ice[- ]blue|sea[- ]green|emerald|sapphire|steel[- ]grey|steel[- ]gray|honey|whiskey|whisky|red|yellow|white|mismatched";
+  const HAIR = "blonde|blond|red|auburn|black|brown|dark|silver|white|grey|gray|copper|ginger|chestnut|raven|pink|blue|green|purple|platinum|sandy|honey|strawberry[- ]blond(?:e)?|jet[- ]black|dark[- ]brown|light[- ]brown|ash[- ]blond(?:e)?";
+  const AGEW = "\\d{1,3}|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?|eighteen|nineteen|seventeen|sixteen|fifteen|fourteen|thirteen|twelve|eleven|ten|one hundred|hundred";
+  const norm = v => v.toLowerCase().replace(/gray/g, "grey").replace(/blond(?!e)/g, "blonde").replace(/whisky/, "whiskey").replace(/[- ]+/g, " ").trim();
+  // sources: [{ where, sceneId|null, md }] → [{ name, attr, values: [{ v, where: [..], sceneId }] }] where more than one value turns up
+  function continuity(cast, sources) {
+    const found = {};
+    const add = (name, attr, v, src, find) => { const k = name + "|" + attr; const f = found[k] = found[k] || { name, attr, vals: {} }; const nv = attr === "age" ? String(numOf(v)) : norm(v); if (nv === "null") return; const e = f.vals[nv] = f.vals[nv] || { v: nv, where: [] }; if (e.where.length < 4 && !e.where.some(w => w.where === src.where)) e.where.push({ where: src.where, sceneId: src.sceneId, find }); };
+    for (const c of cast.filter(c => c.kind === "person")) {
+      const N = "(?:" + [c.name, ...(c.aliases || [])].filter(Boolean).sort((a, b) => b.length - a.length).map(esc).join("|") + ")";
+      const R = [
+        ["eyes", new RegExp(`\\b${N}['’]s\\s+(?:\\w+\\s+)?(${EYE})(?:[- ]coloured|[- ]colored)?\\s+eyes`, "gi")],
+        ["eyes", new RegExp(`\\b${N}\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${EYE})\\s+eyes`, "gi")],
+        ["eyes", new RegExp(`\\b${N}['’]s\\s+eyes\\s+(?:were|are|was|went|turned)\\s+(?:a\\s+)?(${EYE})\\b`, "gi")],
+        ["eyes", new RegExp(`\\b${N}\\b[^.\\n]{0,30}\\b(${EYE})[- ]eyed\\b`, "gi")],
+        ["hair", new RegExp(`\\b${N}['’]s\\s+(?:\\w+\\s+)?(${HAIR})\\s+(?:hair|curls|braid|locks|waves)`, "gi")],
+        ["hair", new RegExp(`\\b${N}\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${HAIR})\\s+hair`, "gi")],
+        ["hair", new RegExp(`\\b${N}['’]s\\s+hair\\s+(?:was|is|were)\\s+(?:a\\s+)?(${HAIR})\\b`, "gi")],
+        ["age", new RegExp(`\\b${N},\\s+(${AGEW}),`, "gi")],
+        ["age", new RegExp(`\\b${N}\\s+(?:was|is|turned|had just turned)\\s+(${AGEW})(?:\\s+years\\s+old|\\b(?=[.,;]))`, "gi")],
+        ["age", new RegExp(`\\b${N},?\\s+(?:a|an|the)\\s+(${AGEW})[- ]year[- ]old`, "gi")],
+        ["age", new RegExp(`\\b(${AGEW})[- ]year[- ]old\\s+${N}\\b`, "gi")]
+      ];
+      for (const src of sources) { const t = clean(src.md); for (const [attr, re] of R) { re.lastIndex = 0; let m; while ((m = re.exec(t))) add(c.name, attr, m[1], src, m[0]); } }
+    }
+    return Object.values(found).map(f => ({ name: f.name, attr: f.attr, values: Object.values(f.vals) })).filter(f => f.values.length > 1);
+  }
+
+  // ---------- the timeline: time words in each scene, and day numbers ----------
+  const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  function timeHints(md) {
+    const t = clean(md), out = [];
+    const re = /\b(the next (?:morning|day|night|evening|afternoon)|the following (?:morning|day|night|week)|(?:a|one|two|three|four|five|six|seven|eight|nine|ten|\d+|several|a few) (?:days?|weeks?|months?|years?|hours?) (?:later|after|passed|went by)|that (?:night|evening|afternoon|morning)|later that (?:day|night|evening)|(?:yester|to)day|tonight|tomorrow|dawn|sunrise|sunset|dusk|midnight|noon|(?:mon|tues|wednes|thurs|fri|satur|sun)day|(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?)\b/gi;
+    let m; while ((m = re.exec(t)) && out.length < 8) if (!out.some(x => x.toLowerCase() === m[1].toLowerCase())) out.push(m[1]);
+    return out;
+  }
+  // how many days a scene's hints move the story on from the scene before
+  function stepOf(hints) {
+    for (const h of hints.map(x => x.toLowerCase())) {
+      if (/^(the next|the following) (morning|day)|^tomorrow/.test(h)) return 1;
+      if (/^the following week/.test(h)) return 7;
+      const m = h.match(/^(a|one|two|three|four|five|six|seven|eight|nine|ten|\d+|several|a few) (day|week|month|year)s?/);
+      if (m) { const n = m[1] === "a" ? 1 : m[1] === "several" ? 3 : m[1] === "a few" ? 3 : (numOf(m[1]) || 1); return n * ({ day: 1, week: 7, month: 30, year: 365 }[m[2]]); }
+    }
+    return 0;
+  }
+  const weekdayOf = date => WEEKDAYS[new Date(date + "T12:00:00").getDay()];
+
+  window.Cast = Object.assign(window.Cast, { continuity, timeHints, stepOf, weekdayOf, WEEKDAYS });
+
 })();

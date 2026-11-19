@@ -83,7 +83,7 @@
     E.busy = true; setSaved("saving");
     try {
       await Store.writeScene(E.book, E.ch, E.sc, md);
-      E.base = md; E.dirty = false; setSaved("saved");
+      E.base = md; E.dirty = false; setSaved("saved"); if (!SP.on) renderStats();
       if (Date.now() - E.lastSnap > 10 * 60 * 1000) { await Store.snapshot(E.book, E.sc, md, "autosave"); E.lastSnap = Date.now(); }
       refreshCounts();
     } catch (e) {
@@ -268,7 +268,7 @@
   }
 
   // ---------- new book: fresh or imported ----------
-  function bookFields(v = {}) {
+  function bookFields(v = {}, more) {
     const pens = Store.pens(), writers = (Store.settings.writers || []).map(w => w.name);
     return `<div class="fields">
       <label class="grow">Title<input name="title" required value="${esc(v.title || "")}"></label>
@@ -278,9 +278,12 @@
       <label>Pen name<select name="penName"><option value="">(none)</option>${pens.map(p => `<option ${v.penName === p.pen ? "selected" : ""} data-w="${esc(p.writer)}">${esc(p.pen)}</option>`).join("")}</select></label>
       <label>Writer<select name="writer">${writers.map(w => `<option ${v.writer === w ? "selected" : ""}>${esc(w)}</option>`).join("")}</select></label>
       <label>Genre<input name="genre" list="genrelist" value="${esc(v.genre || "")}" placeholder="for the Forge"></label>
-      <datalist id="genrelist">${["Harem LitRPG", "Reverse Harem Romance", "Space Opera", "Dark Fantasy"].map(g => `<option value="${g}">`).join("")}</datalist></div>`;
+      <datalist id="genrelist">${["Harem LitRPG", "Reverse Harem Romance", "Space Opera", "Dark Fantasy"].map(g => `<option value="${g}">`).join("")}</datalist>
+      ${more ? `<label class="short">Target words<input name="targetWords" type="number" min="0" step="1000" value="${esc(v.targetWords || "")}"></label>
+      <label>Started<input name="started" type="date" value="${esc(v.started || (v.created || "").slice(0, 10))}"></label>
+      <label>Finished<input name="finished" type="date" value="${esc(v.finished || "")}" title="Leave empty: it's finished when its last Forge stage is done"></label>` : ""}</div>`;
   }
-  const formInfo = form => Object.fromEntries(["title", "series", "seriesNo", "penName", "writer", "genre"].map(k => [k, (form.elements[k] && form.elements[k].value || "").trim()]));
+  const formInfo = form => Object.fromEntries(["title", "series", "seriesNo", "penName", "writer", "genre", "targetWords", "started", "finished"].filter(k => form.elements[k]).map(k => [k, (form.elements[k].value || "").trim()]));
   function wirePen(form) { const p = form.elements.penName; p.onchange = () => { const w = p.selectedOptions[0] && p.selectedOptions[0].dataset.w; if (w) form.elements.writer.value = w; }; }
   async function readAnyText(file) { return /\.docx$/i.test(file.name) ? Import.blocksToMarkdown(await Import.readBlocks(await file.arrayBuffer())) : await file.text(); }
 
@@ -342,6 +345,7 @@
       <aside class="binder"><div class="bk-title"><a href="#/shelf" title="Back to the shelf">‹</a><span>${esc(book.title)}</span></div><div id="binder"></div>
         <button class="btn small quiet addch" id="addch">+ Chapter</button></aside>
       <section class="paper">
+        <div class="deskhead"><div class="statbar" id="statbar"></div>
         <div class="rail" id="rail"></div>
         <div class="deskbar"><span id="where" class="muted small"></span><span class="spacer"></span>
           <button class="btn small quiet" id="dict" title="Dictate into the page (Chrome speech-to-text)">🎙 Dictate</button>
@@ -349,14 +353,14 @@
           <button class="btn small quiet" id="seal" title="Save a version nothing can change">🔒 Seal</button>
           <button class="btn small quiet" id="seals">Seals</button>
           <button class="btn small quiet" id="mode">${mode === "page" ? "Plain" : "Book page"}</button>
-          <button class="btn small quiet" id="tgp">${showPanel ? "Hide panel" : "Panel"}</button></div>
+          <button class="btn small quiet" id="tgp">${showPanel ? "Hide panel" : "Panel"}</button></div></div>
         <div id="ms-page" class="wd-${mode}"><input id="sctitle" class="sctitle" aria-label="Scene title"><div id="ed" class="ed" contenteditable="true" spellcheck="true"></div></div>
         <div class="counts small muted" id="counts"></div>
         <div id="forgeview" class="forgeview hidden"></div></section>
       <aside class="panel"><div class="tabs">${[["beats", "Beats"], ["who", "Cast"], ["ref", "Reference"], ["book", "Book"]].map(([k, l]) => `<button data-t="${k}" class="${panelTab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="ptab"></div></aside></div>`;
     renderBinder();
     if (book.lampTitle && Lamp.state === "ready") { const t = await Lamp.readTitle(book.lampTitle).catch(() => null); if (t && Forge.fromLamp(book, t)) await Store.saveBook(book); }
-    forgeTab = null; renderRail();
+    forgeTab = null; renderRail(); renderStats();
     $("#dict").onclick = () => Dictation.toggle(); if (!Dictation.supported) $("#dict").remove();
     const ed = $("#ed");
     document.execCommand("defaultParagraphSeparator", false, "p");
@@ -486,7 +490,7 @@
       $$("[data-ref]", box).forEach(b => b.onclick = () => { refOpen = b.dataset.ref; renderPanel(); });
       $("#addref").onchange = guard(async e => { for (const f of e.target.files) await Store.addReference(book, f.name.replace(/\.\w+$/, "") + ".md", await readAnyText(f), /\.docx$/i.test(f.name) ? f : null); toast("Reference shelf updated."); renderPanel(); });
     } else {
-      box.innerHTML = `<form id="bookf">${bookFields(book)}<button class="btn small primary">Save details</button></form>
+      box.innerHTML = `<form id="bookf">${bookFields(book, true)}<button class="btn small primary">Save details</button></form>
         <h3>Cover</h3><div class="row"><label class="btn small file-btn">${book.cover ? "Replace cover…" : "Add a cover…"}<input type="file" id="covf" accept="image/*" hidden></label></div>
         <h3>Manuscript</h3><a class="btn small" href="#/import/${encodeURIComponent(book.folder)}">Import a manuscript into this book…</a>
         <h3>Lamp Room</h3>${book.lampTitle ? `<p class="small">Linked to its writing project in the Lamp Room. Title, series, pen name and cover changes here go there too. <a href="${Lamp.url()}" target="lamp-room">Open the Lamp Room ↗</a></p>` : Lamp.state === "ready" ? `<button class="btn small" id="tolamp">Add to the writer's projects in the Lamp Room</button>` : `<p class="small muted">Connect the Lamp Room library in <a href="#/settings">Settings</a> to link this book.</p>`}
@@ -494,7 +498,7 @@
       const f = $("#bookf"); wirePen(f);
       f.onsubmit = guard(async e => { e.preventDefault(); const info = formInfo(f); if (!info.title) return; await Store.updateBook(book, info); $(".bk-title span").textContent = book.title;
         if (book.lampTitle && Lamp.state === "ready") await Lamp.updateTitle(book.lampTitle, book).catch(err => toast("Saved here, but the Lamp Room couldn't be updated: " + err.message));
-        toast("Saved."); });
+        renderStats(); toast("Saved."); });
       $("#tolamp") && ($("#tolamp").onclick = guard(async () => { await sendToLamp(book, Store.bookWords(book) ? "draft" : "outline"); toast("Added to your Lamp Room projects."); renderPanel(); }));
       $("#covf").onchange = guard(async e => { const file = e.target.files[0]; if (!file) return; await Store.setCover(book, file);
         if (book.lampTitle && Lamp.state === "ready") await Lamp.setCover(book.lampTitle, file).catch(err => console.warn(err));
@@ -502,12 +506,84 @@
     }
   }
 
+  // ---------- stats above the stages, writing pace, monthly goal, sprints ----------
+  const ym = () => Store.today().slice(0, 7);
+  const daysBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5));
+  const writerOf = book => (Store.settings.writers || []).find(w => w.name === book.writer) || null;
+  async function paceOf(name) {
+    const key = Lamp.state === "ready" ? Lamp.keyOf(name) : null;
+    if (key) return { wph: await Lamp.pace(key), from: "lamp", key };
+    const w = (Store.settings.writers || []).find(x => x.name === name);
+    return { wph: (w && +w.pace) || 1000, from: w && w.pace ? "desk" : "default", key: null };
+  }
+  function bookSpeed() {
+    const done = Store.books.map(b => Forge.span(b)).filter(x => x.all && x.start && x.finish);
+    if (!done.length) return null;
+    return { days: done.reduce((a, x) => a + daysBetween(x.start, x.finish), 0) / done.length, n: done.length };
+  }
+  const months = d => d / 30.44;
+  async function renderStats() {
+    const book = E.book, el = $("#statbar"); if (!book || !el) return;
+    const total = Store.bookWords(book), target = +book.targetWords || 0, span = Forge.span(book);
+    const days = span.start ? daysBetween(span.start, span.finish || Store.today()) : 0;
+    const avgMonth = days >= 1 ? total / Math.max(1, months(days)) : 0;
+    const w = writerOf(book), goal = w && +w.monthGoal || 0;
+    const mine = Store.books.filter(b => b.writer === book.writer).reduce((a, b) => a + Store.monthWords(b, ym()), 0);
+    const speed = bookSpeed(), pace = await paceOf(book.writer);
+    const left = target > total ? target - total : 0;
+    el.innerHTML = `
+      <div class="st"><span>Words</span><b id="stwords">${num(total)}</b>${target ? `<i class="bar"><i style="width:${Math.min(100, 100 * total / target)}%"></i></i><em>of ${num(target)}</em>` : `<em><a href="#" data-booktab>set a target</a></em>`}</div>
+      <div class="st"><span>This month</span><b>${num(Store.monthWords(book, ym()))}</b><em>this book</em></div>
+      <div class="st"><span>${esc(book.writer || "You")}'s month</span><b>${num(mine)}</b>${goal ? `<i class="bar"><i style="width:${Math.min(100, 100 * mine / goal)}%"></i></i><em>of ${num(goal)}, all books</em>` : `<em><a href="#/settings">set a goal</a></em>`}</div>
+      <div class="st"><span>Per month</span><b>${days >= 1 ? num(Math.round(avgMonth)) : "—"}</b><em>${span.start ? (span.finish ? "start to finish" : "since " + esc(new Date(span.start + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }))) : ""}</em></div>
+      <div class="st"><span>Book speed</span><b>${speed ? months(speed.days).toFixed(1) + " mo" : "—"}</b><em title="${speed ? `Average start-to-finish time of ${speed.n} finished book${speed.n === 1 ? "" : "s"}` : "Shows once a book is finished"}">${speed ? `avg of ${speed.n}` : "none finished yet"}${span.start && !span.finish ? ` · this: ${months(days).toFixed(1)} mo` : ""}</em></div>
+      <div class="st" title="${pace.from === "lamp" ? "Writing pace from the Lamp Room's settings" : "Writing pace from Settings"}"><span>Pace</span><b>${num(pace.wph)}</b><em>words/hr${left ? ` · ${Math.ceil(left / pace.wph)} h left` : ""}</em></div>
+      <div class="st sprint"><button class="btn small ${SP.on ? "primary" : ""}" id="sprintb">${SP.on ? "⏱ " + sprintClock() : "⏱ Sprint"}</button>${SP.on ? `<em>${num(sprintWords())} words so far</em>` : ""}</div>`;
+    $("[data-booktab]", el) && ($("[data-booktab]", el).onclick = e => { e.preventDefault(); panelTab = "book"; localStorage.setItem("wd-panel-tab", "book"); localStorage.setItem("wd-panel", "on"); viewBook(); });
+    $("#sprintb").onclick = guard(sprintMenu);
+  }
+  const SP = { on: false, end: 0, min: 0, start: 0, timer: 0, book: null };
+  function liveWords() { const b = E.book; if (!b) return 0; const ed = editorEl(); const extra = E.sc && ed ? Store.words(Editor.htmlToMd(ed)) - (E.sc.words || 0) : 0; return Store.bookWords(b) + extra; }
+  const sprintWords = () => Math.max(0, liveWords() - SP.start);
+  const sprintClock = () => { const ms = Math.max(0, SP.end - Date.now()), m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60; return `${m}:${String(s).padStart(2, "0")}`; };
+  async function sprintMenu() {
+    if (SP.on) { if (await confirmBox("End the sprint now?", "End it")) endSprint(); return; }
+    const m = await modal(`<h2>Writing sprint</h2><p class="small">Write until the timer runs out. The Desk counts the words you add to this book.</p>
+      <div class="row">${[10, 15, 25, 45, 60].map(n => `<button class="btn ${n === 25 ? "primary" : ""}" data-close="${n}">${n} min</button>`).join("")}</div>`);
+    if (!m) return;
+    Object.assign(SP, { on: true, min: +m, end: Date.now() + m * 60000, start: liveWords(), book: E.book });
+    clearInterval(SP.timer); SP.timer = setInterval(() => { if (Date.now() >= SP.end) endSprint(); else if (E.book === SP.book) { const b = $("#sprintb"); if (b) { b.textContent = "⏱ " + sprintClock(); const em = b.nextElementSibling; if (em) em.textContent = num(sprintWords()) + " words so far"; } } }, 1000);
+    renderStats(); toast(`Go. ${m} minutes.`); editorEl() && editorEl().focus();
+  }
+  async function endSprint() {
+    clearInterval(SP.timer); if (!SP.on) return;
+    const book = SP.book, minutes = Math.max(1, Math.round((SP.min * 60000 - Math.max(0, SP.end - Date.now())) / 60000)), words = E.book === book ? sprintWords() : 0;
+    SP.on = false; await saveNow();
+    const wph = Math.round(words / (minutes / 60));
+    book.sprints = (book.sprints || []).concat([{ at: new Date().toISOString(), minutes, words }]).slice(-200); await Store.saveBook(book);
+    const pace = await paceOf(book.writer), linked = book.lampTitle && Lamp.state === "ready";
+    const stage = (Forge.STAGES.find(x => x.lamp && !Forge.isDone(book, x.key)) || { lamp: "draft" }).lamp;
+    renderStats();
+    await modal(`<h2>Sprint done</h2><div class="tiles"><div class="tile"><span>Words</span><b>${num(words)}</b></div><div class="tile"><span>Minutes</span><b>${minutes}</b></div><div class="tile"><span>Words / hour</span><b>${num(wph)}</b><em>your pace: ${num(pace.wph)}</em></div></div>
+      <div class="row end">${words > 0 ? `<button class="btn" id="setpace">Make ${num(wph)} my writing pace</button>` : ""}${linked ? `<button class="btn" id="tolog">Add it to today's Lamp Room log</button>` : ""}<button class="btn primary" data-close>Done</button></div>`,
+      { mount: (d) => {
+        $("#setpace", d) && ($("#setpace", d).onclick = guard(async () => { await setPaceFor(book.writer, wph); $("#setpace", d).disabled = true; toast("Writing pace updated" + (pace.key ? " in the Lamp Room too." : ".")); renderStats(); }));
+        $("#tolog", d) && ($("#tolog", d).onclick = guard(async () => { const key = Lamp.keyOf(book.writer) || "anne"; await Lamp.addLog(key, book.lampTitle, stage, minutes, words); $("#tolog", d).disabled = true; toast(`Logged: ${minutes} minute${minutes === 1 ? "" : "s"} on ${book.title} in the Lamp Room.`); }));
+      } });
+  }
+  async function setPaceFor(name, wph) {
+    const key = Lamp.state === "ready" ? Lamp.keyOf(name) : null;
+    if (key) await Lamp.setPace(key, wph);
+    const w = (Store.settings.writers || []).find(x => x.name === name); if (w) { w.pace = Math.round(wph); await Store.saveSettings(); }
+  }
+  setInterval(() => { if (E.book && E.dirty && !SP.on) { const b = $("#stwords"); if (b) b.textContent = num(liveWords()); } }, 2000);
+
   // ---------- the Forge: stage tabs above the page ----------
   let forgeTab = null;
   function renderRail() {
     const book = E.book, el = $("#rail"); if (!book || !el) return;
     const cur = Forge.current(book);
-    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
+    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
       const done = Forge.isDone(book, s.key), blocked = !done && Forge.blockedBy(book, s.key);
       return `<button data-ft="${s.key}" class="${forgeTab === s.key ? "on" : ""} ${done ? "done" : s.key === cur ? "cur" : ""} ${blocked ? "blocked" : ""}" title="${done ? "Done" : s.key === cur ? "You are here" : blocked ? "Not ready: " + esc(blocked.item[1]) + " (" + blocked.stage.label + ")" : ""}">${done ? "✓ " : s.key === cur ? "● " : ""}${s.label}</button>`;
     }).join("");
@@ -518,8 +594,8 @@
     $("#ms-page").classList.toggle("hidden", on); $("#counts").classList.toggle("hidden", on);
     $$(".deskbar .btn").forEach(b => b.classList.toggle("hidden", on && b.id !== "tgp"));
     fv.classList.toggle("hidden", !on);
-    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
-    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (on) renderForge();
+    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
+    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (on) renderForge();
   }
   async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Copied. Paste it into the series' Claude Project chat."); } catch (e) { toast("Couldn't copy: select the text and copy it by hand."); } }
   function renderForge() {
@@ -545,15 +621,15 @@
     $$("[data-goft]", fv).forEach(a => a.onclick = e => { e.preventDefault(); forgeTab = a.dataset.goft; renderRail(); showForge(); });
     $("#nextcopy") && ($("#nextcopy").onclick = () => copyText(next.prompt(ctx)));
     $("#markdone") && ($("#markdone").onclick = guard(async () => {
-      const st = Forge.state(book); for (const x of Forge.STAGES.slice(0, idx + 1)) st.done[x.key] = true;
+      const st = Forge.state(book), day = Store.today(); for (const x of Forge.STAGES.slice(0, idx + 1)) { if (!st.done[x.key]) st.doneAt[x.key] = day; st.done[x.key] = true; }
       await Store.saveBook(book);
       let lampMsg = "";
       if (book.lampTitle && s.lamp) { if (Lamp.state === "ready") { await Lamp.setStage(book.lampTitle, s.lamp, true); lampMsg = " Ticked in the Lamp Room too."; } else lampMsg = " Connect the Lamp Room in Settings to tick it there."; }
       toast(`${s.label} done.${lampMsg}`);
-      if (next) forgeTab = next.key; renderRail(); showForge();
+      if (next) forgeTab = next.key; renderRail(); showForge(); renderStats();
     }));
     $("#reopen") && ($("#reopen").onclick = guard(async () => {
-      const st = Forge.state(book); for (const x of Forge.STAGES.slice(idx)) delete st.done[x.key];
+      const st = Forge.state(book); for (const x of Forge.STAGES.slice(idx)) { delete st.done[x.key]; delete st.doneAt[x.key]; }
       await Store.saveBook(book);
       if (book.lampTitle && s.lamp && Lamp.state === "ready") await Lamp.setStage(book.lampTitle, s.lamp, false);
       toast(`${s.label} reopened.`); renderRail(); renderForge();
@@ -633,6 +709,57 @@
     $$("[data-word]", fv).forEach(b => b.onclick = guard(async () => { forgeTab = null; renderRail(); showForge(); const n = Checks.highlight(editorEl(), [" " + b.dataset.word + " ", " " + b.dataset.word + ".", " " + b.dataset.word + ",", b.dataset.word + " "]); toast(n ? `“${b.dataset.word}” lit up in this scene (${n}). Typing clears it.` : `No “${b.dataset.word}” in this scene.`); }));
   }
 
+  // ---------- the timeline ----------
+  async function renderTimeline() {
+    const book = E.book, fv = $("#forgeview");
+    fv.innerHTML = `<div class="fv-head"><h2>Timeline</h2></div><p class="small muted">Reading the book…</p>`;
+    await saveNow();
+    const scenes = await scenesOf(book);
+    const rows = scenes.map(x => { const sc = Store.find(book, x.id).sc; return { x, sc, when: sc.when || {}, hints: Cast.timeHints(x.md) }; });
+    const start = book.storyStart || "";
+    const dateOf = d => { if (!start || !d) return ""; const t = new Date(start + "T12:00:00"); t.setDate(t.getDate() + (+d - 1)); return t.toISOString().slice(0, 10); };
+    // problems: days going backwards, a weekday in the text that doesn't match the date, "next morning" with no day change
+    let prev = null; for (const r of rows) {
+      r.warn = [];
+      const d = +r.when.day || null, step = Cast.stepOf(r.hints);
+      if (d && prev && d < prev && !r.when.flashback) r.warn.push(`Day ${d} comes after Day ${prev}. A flashback? Tick it.`);
+      if (d && prev && step && d - prev !== step && !r.when.flashback) r.warn.push(`The text says ${step === 1 ? "the next day" : step + " days later"}, but the days move ${d - prev}.`);
+      const date = r.when.date || dateOf(d);
+      if (date) { const wd = Cast.weekdayOf(date); const said = r.hints.map(h => h.toLowerCase()).find(h => Cast.WEEKDAYS.includes(h)); if (said && said !== wd) r.warn.push(`It mentions ${said[0].toUpperCase() + said.slice(1)}, but ${date} is a ${wd[0].toUpperCase() + wd.slice(1)}.`); }
+      if (d) prev = d;
+    }
+    let lastCh = "";
+    fv.innerHTML = `<div class="fv-head"><h2>Timeline</h2><span class="muted small">Which day each scene happens on, checked against the time words in the text</span></div>
+      <div class="row"><label>Day 1 is<input type="date" id="tstart" value="${esc(start)}"></label><span class="small muted">optional: gives every day a date and checks weekdays</span><span class="spacer"></span><button class="btn small" id="tsuggest">Fill in days from the text</button></div>
+      <table class="ctable tline"><tr><th>Scene</th><th>Day</th><th>Time</th><th>Date</th><th>Time words in the text</th></tr>
+      ${rows.map(r => { const head = r.x.ch !== lastCh ? `<tr class="tch"><td colspan="5">${esc(r.x.ch)}</td></tr>` : ""; lastCh = r.x.ch; const date = r.when.date || dateOf(r.when.day);
+        return head + `<tr data-id="${r.x.id}" class="${r.warn.length ? "warnrow" : ""}"><td><a href="#" data-open="${r.x.id}">${esc(r.x.title)}</a>${r.warn.map(w => `<div class="small bad">${esc(w)}</div>`).join("")}</td>
+          <td><input type="number" min="1" class="tday" data-f="day" value="${esc(r.when.day || "")}"></td>
+          <td><select data-f="time">${["", "morning", "afternoon", "evening", "night"].map(t => `<option ${r.when.time === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>
+          <td class="small">${date ? esc(date) + " · " + Cast.weekdayOf(date).slice(0, 3) : ""}<label class="check small"><input type="checkbox" data-f="flashback" ${r.when.flashback ? "checked" : ""}> flashback</label></td>
+          <td class="small">${r.hints.map(h => `<span class="hint-chip">${esc(h)}</span>`).join(" ")}</td></tr>`; }).join("")}</table>`;
+    const save = guard(async () => { await Store.saveBook(book); });
+    $("#tstart").onchange = async e => { book.storyStart = e.target.value; await save(); renderTimeline(); };
+    $$("[data-open]", fv).forEach(a => a.onclick = guard(async e => { e.preventDefault(); forgeTab = null; renderRail(); showForge(); await openScene(a.dataset.open); }));
+    $$("tr[data-id] [data-f]", fv).forEach(inp => inp.onchange = async () => {
+      const sc = Store.find(book, inp.closest("tr").dataset.id).sc; sc.when = sc.when || {};
+      const f = inp.dataset.f; sc.when[f] = f === "flashback" ? inp.checked : f === "day" ? (+inp.value || null) : inp.value;
+      await save(); renderTimeline();
+    });
+    $("#tsuggest").onclick = guard(async () => {
+      let day = 0, filled = 0;
+      for (const r of rows) {
+        if (r.when.flashback) continue;
+        if (+r.when.day) { day = +r.when.day; continue; }
+        day = day ? day + Cast.stepOf(r.hints) : 1;
+        r.sc.when = Object.assign({}, r.sc.when, { day }); filled++;
+        const tm = r.hints.map(h => h.toLowerCase()).find(h => /morning|dawn|sunrise|afternoon|noon|evening|dusk|sunset|night|midnight/.test(h));
+        if (tm && !r.sc.when.time) r.sc.when.time = /morning|dawn|sunrise/.test(tm) ? "morning" : /afternoon|noon/.test(tm) ? "afternoon" : /evening|dusk|sunset/.test(tm) ? "evening" : "night";
+      }
+      await save(); toast(filled ? `Filled in ${filled} scene${filled === 1 ? "" : "s"}. Days you'd already set were kept.` : "Every scene already has a day."); renderTimeline();
+    });
+  }
+
   // ---------- people and places ----------
   async function renderCast() {
     const book = E.book, fv = $("#forgeview"); book.cast = book.cast || [];
@@ -642,6 +769,7 @@
     const refs = await Store.listReference(book); let bible = "";
     for (const r of refs) if (!/^Imported manuscript/i.test(r.name)) bible += "\n" + await Store.readReference(book, r.name);
     const sug = Cast.suggest(bible, scenes.map(s => s.md), book.cast);
+    const conflicts = Cast.continuity(book.cast, [{ where: "Reference shelf", sceneId: null, md: bible }].concat(scenes.map(s => ({ where: s.ch + " › " + s.title, sceneId: s.id, md: s.md }))));
     const counts = Cast.count(book.cast, scenes);
     const byCh = book.chapters.map(c => { const o = {}; for (const sc of c.scenes) for (const [k, n] of Object.entries(counts[sc.id] || {})) o[k] = (o[k] || 0) + n; return o; });
     const max = Math.max(1, ...byCh.flatMap(o => Object.values(o)));
@@ -656,6 +784,8 @@
     const table = kind => { const cs = book.cast.filter(c => c.kind === kind); return cs.length ? `<div class="hscroll"><table class="ctable heat"><tr><th>${kind === "person" ? "People" : "Places"}</th>${book.chapters.map((c, i) => `<th title="${esc(c.title)}">${i + 1}</th>`).join("")}<th>Total</th><th>First</th><th></th><th></th></tr>${cs.map(rowFor).join("")}</table></div>` : ""; };
     fv.innerHTML = `<div class="fv-head"><h2>People &amp; places</h2><span class="muted small">When and how often each one turns up, chapter by chapter</span></div>
       ${book.cast.length ? table("person") + table("place") + `<p class="small muted">Click a number to open the first scene in that chapter where the name turns up.</p>` : `<p>No one's on the list yet. Keep the suggestions below with one click.</p>`}
+      ${book.cast.length ? `<div class="card cont"><h3>Continuity: details that don't agree</h3>${conflicts.length ? conflicts.map(c => `<div class="crow plain"><span><b>${esc(c.name)}</b>: ${esc(c.attr)}</span></div>${c.values.map(v => `<div class="ex"><b>${esc(v.v)}</b> <span class="muted small">${v.where.map(w => esc(w.where)).join(" · ")}</span>${v.where.filter(w => w.sceneId).slice(0, 1).map(w => ` <button class="btn small quiet" data-go="${esc(w.sceneId)}" data-find="${esc(w.find)}">Show</button>`).join("")}</div>`).join("")}`).join("") : `<p class="small">Nothing disagrees: eye colour, hair colour and ages match everywhere they're mentioned${bible ? ", including the bible" : ""}.</p>`}
+        <p class="small muted">Checks eyes, hair and ages for everyone on the list, in the manuscript and the reference shelf. An age can change legitimately (a birthday, a later book).</p></div>` : ""}
       ${sug.length ? `<div class="card sugg"><h3>Suggested</h3><p class="small muted">From the bible and codex on the reference shelf, and from names that keep turning up in the manuscript. Untick anything that isn't a person or a place.</p>
         <div class="found">${sug.map((c, i) => `<label class="check"><input type="checkbox" data-s="${i}" ${c.from === "bible" || c.kind === "place" ? "checked" : ""}> <span class="grow"><b>${esc(c.name)}</b>${c.aliases.length ? ` <span class="muted small">also ${esc(c.aliases.join(", "))}</span>` : ""}</span><select data-k="${i}"><option value="person" ${c.kind === "person" ? "selected" : ""}>person</option><option value="place" ${c.kind === "place" ? "selected" : ""}>place</option></select><span class="muted small">${c.from}</span></label>`).join("")}</div>
         <button class="btn primary" id="keep">Keep the ticked ones</button></div>` : ""}
@@ -664,6 +794,7 @@
     $("#keep") && ($("#keep").onclick = guard(async () => { for (const c of $$("[data-s]", fv)) if (c.checked) { const x = sug[+c.dataset.s]; book.cast.push({ name: x.name, aliases: x.aliases, kind: $(`[data-k="${c.dataset.s}"]`, fv).value }); } await save(); }));
     $("#addn").onsubmit = guard(async e => { e.preventDefault(); const n = $("#nn").value.trim(); if (!n || book.cast.some(c => c.name === n)) return; book.cast.push({ name: n, aliases: n.includes(" ") ? [n.split(" ")[0]] : [], kind: $("#nk").value }); await save(); });
     $$("[data-del]", fv).forEach(b => b.onclick = guard(async () => { book.cast = book.cast.filter(c => c.name !== b.dataset.del); await save(); }));
+    $$("[data-go]", fv).forEach(b => b.onclick = guard(() => goFind(b.dataset.go, b.dataset.find)));
     $$("[data-edit]", fv).forEach(b => b.onclick = guard(async () => { const c = book.cast.find(x => x.name === b.dataset.edit); const v = await promptBox(`Other names for ${c.name} (commas between)`, (c.aliases || []).join(", ")); if (v == null) return; c.aliases = v.split(",").map(x => x.trim()).filter(Boolean); await save(); }));
     $$("[data-cell]", fv).forEach(td => td.onclick = guard(async () => {
       const ch = book.chapters[+td.dataset.cell], c = book.cast.find(x => x.name === td.dataset.name);
@@ -686,7 +817,7 @@
         $("#restore", d).onclick = guard(async () => {
           const t = await Store.readSnapshot(book, sc, cur);
           await Store.snapshot(book, sc, E.base, "before restore");
-          await Store.writeScene(book, ch, sc, t, true); E.base = t; if (E.sc === sc) $("#ed").innerHTML = Editor.mdToHtml(t);
+          await Store.writeScene(book, ch, sc, t, true, true); E.base = t; if (E.sc === sc) $("#ed").innerHTML = Editor.mdToHtml(t);
           renderBinder(); refreshCounts(); close(); toast("Restored. The version you replaced is in History too.");
         });
         show(cur);
@@ -785,9 +916,14 @@
     const drawW = () => {
       $("#wr").innerHTML = (S.writers || []).map((w, i) => `<div class="fields wrow"><label>Writer<input data-w="${i}" value="${esc(w.name)}"></label>
         ${[0, 1].concat((w.pens || []).slice(2).map((_, j) => j + 2)).map(j => `<label>Pen name ${j + 1}<input data-p="${i}:${j}" value="${esc((w.pens || [])[j] || "")}"></label>`).join("")}
+        <label class="short">Monthly goal<input type="number" min="0" step="1000" data-goal="${i}" value="${esc(w.monthGoal || "")}" placeholder="words"></label>
+        <label class="short">Writing pace<input type="number" min="100" step="50" data-pace="${i}" value="${esc(w.pace || "")}" placeholder="words/hr"></label>
         <button class="btn small quiet" data-morep="${i}" title="Another pen name">+ pen name</button>${S.writers.length > 1 ? `<button class="btn small quiet" data-delw="${i}" title="Remove writer">✕</button>` : ""}</div>`).join("");
       $$("[data-w]").forEach(x => x.oninput = x.onchange = () => { S.writers[+x.dataset.w].name = x.value.trim() || "Writer"; save(); });
       $$("[data-p]").forEach(x => x.oninput = x.onchange = () => { const [i, j] = x.dataset.p.split(":").map(Number); const p = S.writers[i].pens = S.writers[i].pens || []; p[j] = x.value.trim(); S.writers[i].pens = p.map(v => v || ""); save(); });
+      $$("[data-goal]").forEach(x => x.oninput = x.onchange = () => { S.writers[+x.dataset.goal].monthGoal = +x.value || 0; save(); });
+      $$("[data-pace]").forEach(x => x.onchange = guard(async () => { const w = S.writers[+x.dataset.pace]; if (+x.value > 0) { await setPaceFor(w.name, +x.value); toast("Writing pace saved" + (Lamp.state === "ready" && Lamp.keyOf(w.name) ? ", in the Lamp Room too." : ".")); } }));
+      (async () => { for (const [i, w] of S.writers.entries()) { const p = await paceOf(w.name); const inp = $(`[data-pace="${i}"]`); if (inp && p.from !== "default") inp.value = p.wph; if (inp && p.from === "lamp") inp.title = "From the Lamp Room's settings; changing it here changes it there"; } })();
       $$("[data-morep]").forEach(x => x.onclick = () => { const w = S.writers[+x.dataset.morep]; w.pens = (w.pens || []).concat(["", ""]).slice(0, Math.max(2, (w.pens || []).length) + 1); drawW(); });
       $$("[data-delw]").forEach(x => x.onclick = () => { S.writers.splice(+x.dataset.delw, 1); save(); drawW(); });
     };

@@ -103,7 +103,7 @@
     // a new writing project from a Desk book; lands in the Lamp Room's "Writing projects" for its writer
     async createTitle(book, stage) {
       const writer = this.keyOf(book.writer) || "anne", ci = Math.max(0, AUTHOR_KEYS.indexOf(stage || "outline"));
-      const t = { kind: "author", status: "active", name: book.title, short: "", writer, publisher: writer, targetWords: 0, due: null,
+      const t = { kind: "author", status: "active", name: book.title, short: "", writer, publisher: writer, targetWords: +book.targetWords || 0, due: null,
         penName: book.penName || "", series: book.series || "", seriesNo: seriesNo(book.seriesNo),
         priorHours: { anne: 0, jack: 0 }, color: INKS[this.titles.length % INKS.length],
         stages: AUTHOR_KEYS.map((k, i) => ({ id: "a-" + k, type: k, owner: writer, after: i ? ["a-" + AUTHOR_KEYS[i - 1]] : [], done: i < ci, doneDate: i < ci ? today() : null, estHours: null })) };
@@ -115,7 +115,7 @@
     // keep a linked project's name, series and pen name in step with the Desk (nothing else is touched)
     async updateTitle(id, book) {
       const td = await this.titlesDir(true), cur = await readJson(td, safeId(id) + ".json"); if (!cur) return false;
-      const next = Object.assign({}, cur, { name: book.title, series: book.series || "", seriesNo: seriesNo(book.seriesNo), penName: book.penName || "" });
+      const next = Object.assign({}, cur, { name: book.title, series: book.series || "", seriesNo: seriesNo(book.seriesNo), penName: book.penName || "" }, book.targetWords ? { targetWords: +book.targetWords || 0 } : {});
       if (JSON.stringify(next) === JSON.stringify(cur)) return false;
       await writeFile(td, safeId(id) + ".json", JSON.stringify(next, null, 1));
       const t = this.byId(id); if (t) Object.assign(t, next, { id });
@@ -137,6 +137,23 @@
       await writeFile(td, safeId(id) + ".json", JSON.stringify(next, null, 1));
       const t = this.byId(id); if (t) Object.assign(t, next, { id });
       return true;
+    },
+    // the planner's writing pace (words an hour) lives in Ledger/config.json → people.<anne|jack>.writeWph
+    DEFAULT_WPH: { anne: 1000, jack: 800 },
+    async config() { try { return await readJson(await this.root.getDirectoryHandle("Ledger"), "config.json"); } catch (e) { return null; } },
+    async pace(key) { const c = await this.config(); return (c && c.people && c.people[key] && +c.people[key].writeWph) || this.DEFAULT_WPH[key] || 1000; },
+    async setPace(key, wph) {
+      const ld = await this.root.getDirectoryHandle("Ledger", { create: true }), cur = (await readJson(ld, "config.json")) || {};
+      cur.people = cur.people || {}; cur.people[key] = Object.assign({}, cur.people[key], { writeWph: Math.round(wph) });
+      await writeFile(ld, "config.json", JSON.stringify(cur, null, 1));
+    },
+    // a writing session as a line in the Lamp Room's Log (time on the book's current stage), only when asked
+    async addLog(key, titleId, stageKey, minutes, words) {
+      const ld = await this.root.getDirectoryHandle("Ledger", { create: true }), dir = await ld.getDirectoryHandle("logs", { create: true });
+      const date = today(), id = "log-" + date + "-" + uid();
+      const doc = { date, person: key, raw: "Writing Desk sprint", entries: [{ person: key, titleId, stageId: "a-" + (stageKey || "draft"), kind: "author", hours: Math.max(0.25, Math.round(minutes / 60 * 4) / 4), auto: false, finished: false, finishedOn: null, note: `${words.toLocaleString()} words in a Writing Desk sprint` }], ot: null, createdAt: new Date().toISOString(), by: key };
+      await writeFile(dir, safeId(id) + ".json", JSON.stringify(doc, null, 1));
+      return id;
     },
     async setCover(id, blob) {
       const cd = await this.root.getDirectoryHandle("Covers", { create: true });
