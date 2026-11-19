@@ -145,3 +145,40 @@ body.on-desk main { max-width: none; padding: 0; }
 /* dictation */
 #dict.rec { color: #fff; background: #b3261e; border-color: #b3261e; }
 #dictlive { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); max-width: 640px; background: rgba(0,0,0,.78); color: #fff; font: 15px var(--serif); padding: 8px 16px; border-radius: 10px; z-index: 50; }
+
+/* style check */
+::highlight(wd-check) { background: color-mix(in srgb, var(--accent) 38%, transparent); color: inherit; }
+.chips { gap: 6px; margin: 10px 0 14px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tiles .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; }
+.tiles .tile span { font: 600 10.5px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.tiles .tile b { font: 600 24px var(--serif); color: var(--ink); }
+.tiles .tile em { font-style: normal; font-size: 12px; color: var(--muted); }
+.csec { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 10px 14px; margin-bottom: 10px; }
+.csec > summary { cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.csec h4 { margin: 14px 0 6px; font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.crow { border-top: 1px solid var(--line); padding: 6px 0; }
+.crow > summary, .crow.plain { display: flex; gap: 10px; align-items: baseline; cursor: pointer; }
+.crow.plain { cursor: default; }
+.crow > summary span:first-child, .crow.plain span:first-child { flex: 1; }
+.ex { font-size: 13.5px; padding: 5px 0 5px 12px; border-left: 2px solid var(--line); margin: 4px 0; font-family: var(--serif); }
+.ex .muted { font-family: var(--sans); display: block; }
+.wgrid { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.wchip { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 2px 10px; font-size: 12.5px; cursor: pointer; color: var(--ink); }
+.wchip.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ctable { border-collapse: collapse; font-size: 13px; width: 100%; margin: 6px 0; }
+.ctable th, .ctable td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; }
+.ctable td.bad, .bad { color: var(--bad, #b3261e); }
+/* people & places */
+.hscroll { overflow-x: auto; margin-bottom: 14px; }
+.heat th:first-child { white-space: nowrap; }
+.heat td.hc { text-align: center; min-width: 26px; background: color-mix(in srgb, var(--accent) calc(var(--a) * 70%), transparent); cursor: default; }
+.heat td.hc[data-cell] { cursor: pointer; }
+.cname { font-weight: 600; }
+.sugg { margin: 12px 0; }
+#addn input { flex: 1; }
+.castrow { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.packtext { min-height: 260px; font: 13px/1.5 var(--mono); }
+.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.rail { position: sticky; top: 0; z-index: 3; min-height: 38px; }
+.deskbar { top: 38px; }

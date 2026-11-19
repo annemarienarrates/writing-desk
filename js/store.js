@@ -73,6 +73,7 @@ This folder is The Writing Desk's library. Everything here is plain files.
 - \`Books/<Book>/Reference/\`: copies of the bible, tropes, outlines and codex. The working versions live in the Claude Project.
 - \`Books/<Book>/Snapshots/\`: rolling history the Desk keeps. Leave it alone.
 - \`Books/<Book>/Trash/\`: deleted scenes. Leave it alone.
+- \`Genre Packs/<Genre>.md\`: the master genre packs; \`<Genre>.checks.json\` beside each holds the style checker's extras for that genre.
 
 ## Rules
 1. **Never write to, rename or delete anything in a \`Sealed/\` folder, for any reason.** Sealed versions are locked; the Desk checks their fingerprints.
@@ -80,6 +81,38 @@ This folder is The Writing Desk's library. Everything here is plain files.
 3. Don't add or reorder scenes by editing book.json. Ask Anne to do it in the Desk, or write a new scene's text in chat for her to paste.
 4. Love scenes: leave the marker \`[xx — scene]\` and a brief; the authors write those scenes.
 5. If the Desk has the same scene open with unsaved changes, it will ask Anne which version to keep. Nothing is lost either way.
+`;
+
+  const STARTER_CHECKS = {
+    "Harem LitRPG": { tells: ["a wave of", "status screen flickered"], budgets: {}, ignore: [] },
+    "Reverse Harem Romance": { tells: ["a wave of heat", "her core", "possessive growl", "mine, he growled"], budgets: {}, ignore: [] },
+    "Space Opera": { tells: ["the vastness of space", "hummed with power", "the hum of the engines"], budgets: {}, ignore: [] },
+    "Dark Fantasy": { tells: ["ancient evil", "an ancient power", "the darkness within"], budgets: {}, ignore: [] }
+  };
+  const starterPack = g => `# ${g} genre pack
+
+A starter outline, not your rules yet. Replace it with your master genre pack (Settings › Genre packs › Replace from a file),
+or fill in each section. This is the copy that goes into every new ${g} series Project as genre-pack.md.
+
+## POV and tense
+
+## Prose rules
+
+## Heat level
+
+## Real-world texture
+Dated on purpose: places, references, brands, slang, swearing. Copyright limits.
+
+## Formatting
+
+## The MC's voice
+Signature mutter, plus a rotation pool.
+
+## Reader expectations
+
+## Checks
+The style checker's extra tells, budgets and ignored lines for this genre live beside this file, in "${g}.checks.json"
+(edit them in Settings › Genre packs).
 `;
 
   const Store = {
@@ -117,6 +150,7 @@ This folder is The Writing Desk's library. Everything here is plain files.
       if (!s) await this.saveSettings();
       const n = await readFile(this.root, "NOTES FOR CLAUDE.md");
       if (!n || n.text !== CLAUDE_NOTES) await writeFile(this.root, "NOTES FOR CLAUDE.md", CLAUDE_NOTES);
+      await this.ensurePacks();
       await this.loadBooks();
     },
     async saveSettings() { await writeFile(this.root, "desk.json", JSON.stringify(this.settings, null, 2)); },
@@ -399,6 +433,32 @@ This folder is The Writing Desk's library. Everything here is plain files.
     },
     async updateBook(book, patch) {
       Object.assign(book, patch); await this.saveBook(book);
+    },
+
+    // ---------- genre packs: the master copies, one per genre, in <Library>/Genre Packs ----------
+    //   <Genre>.md            the style guide and genre rules (the master Series Forge copies into each series Project)
+    //   <Genre>.checks.json   what the style checker adds for this genre: { tells: [], budgets: { phrase: per chapter }, ignore: [] }
+    GENRES: ["Harem LitRPG", "Reverse Harem Romance", "Space Opera", "Dark Fantasy"],
+    async packsDir() { return this.root.getDirectoryHandle("Genre Packs", { create: true }); },
+    async ensurePacks() {
+      const d = await this.packsDir(), have = await names(d, "file");
+      for (const g of this.GENRES) {
+        if (!have.includes(g + ".md")) await writeFile(d, g + ".md", starterPack(g));
+        if (!have.includes(g + ".checks.json")) await writeFile(d, g + ".checks.json", JSON.stringify(STARTER_CHECKS[g] || { tells: [], budgets: {}, ignore: [] }, null, 2));
+      }
+    },
+    async listPacks() { const d = await this.packsDir(); return (await names(d, "file")).filter(n => /\.md$/.test(n)).map(n => n.replace(/\.md$/, "")); },
+    async readPack(g) {
+      if (!g) return null;
+      const d = await this.packsDir(), t = await readFile(d, safe(g) + ".md"), c = await readFile(d, safe(g) + ".checks.json");
+      if (!t && !c) return null;
+      let checks = { tells: [], budgets: {}, ignore: [] }; try { if (c) checks = Object.assign(checks, JSON.parse(c.text)); } catch (e) { }
+      return { genre: g, text: t ? t.text : "", checks };
+    },
+    async savePack(g, text, checks) {
+      const d = await this.packsDir();
+      if (text != null) { const cur = await readFile(d, safe(g) + ".md"); if (cur && cur.text !== text) { const pd = await d.getDirectoryHandle("Previous", { create: true }); await writeFile(pd, `${stamp()} ${safe(g)}.md`, cur.text); } await writeFile(d, safe(g) + ".md", text); }
+      if (checks) await writeFile(d, safe(g) + ".checks.json", JSON.stringify(checks, null, 2));
     },
 
     // ---------- backup: the whole library as one zip ----------

@@ -81,7 +81,7 @@
       setSaved("error"); toast("Couldn't save: " + e.message, 6000);
     } finally { E.busy = false; }
   }
-  function onType() { const ed = editorEl(); ed && Editor.tidy(ed); E.dirty = true; setSaved("unsaved"); clearTimeout(E.timer); E.timer = setTimeout(saveNow, 1200); }
+  function onType() { const ed = editorEl(); ed && Editor.tidy(ed); Checks.clear(); E.dirty = true; setSaved("unsaved"); clearTimeout(E.timer); E.timer = setTimeout(saveNow, 1200); }
   // Claude (or anyone) changed the open scene's file
   async function checkOutside() {
     if (!E.sc || E.conflict || E.busy || closeModal) return;
@@ -342,7 +342,7 @@
         <div id="ms-page" class="wd-${mode}"><input id="sctitle" class="sctitle" aria-label="Scene title"><div id="ed" class="ed" contenteditable="true" spellcheck="true"></div></div>
         <div class="counts small muted" id="counts"></div>
         <div id="forgeview" class="forgeview hidden"></div></section>
-      <aside class="panel"><div class="tabs">${[["beats", "Beats"], ["ref", "Reference"], ["book", "Book"]].map(([k, l]) => `<button data-t="${k}" class="${panelTab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="ptab"></div></aside></div>`;
+      <aside class="panel"><div class="tabs">${[["beats", "Beats"], ["who", "Cast"], ["ref", "Reference"], ["book", "Book"]].map(([k, l]) => `<button data-t="${k}" class="${panelTab === k ? "on" : ""}">${l}</button>`).join("")}</div><div id="ptab"></div></aside></div>`;
     renderBinder();
     if (book.lampTitle && Lamp.state === "ready") { const t = await Lamp.readTitle(book.lampTitle).catch(() => null); if (t && Forge.fromLamp(book, t)) await Store.saveBook(book); }
     forgeTab = null; renderRail();
@@ -452,6 +452,15 @@
       let t = 0; const ta = $("#beats");
       ta && (ta.oninput = () => { clearTimeout(t); t = setTimeout(guard(async () => { ch.beats = ta.value; await Store.saveBook(book); }), 800); });
       $$("[data-go]", box).forEach(b => b.onclick = () => openScene(b.dataset.go));
+    } else if (panelTab === "who") {
+      const cast = book.cast || [];
+      if (!cast.length) { box.innerHTML = `<p class="small muted">No one's on the list yet. Open <b>👥 Cast</b> above the page: it suggests names from the bible and the manuscript, and one click keeps them.</p>`; return; }
+      const here = E.sc ? Cast.count(cast, [{ id: "s", md: Editor.htmlToMd(editorEl()) }]).s || {} : {};
+      const chs = E.ch ? await scenesOf(book, [E.ch]) : [], inCh = {}; for (const r of Object.values(Cast.count(cast, chs))) for (const [k, n] of Object.entries(r)) inCh[k] = (inCh[k] || 0) + n;
+      const row = (k, n) => `<div class="castrow"><span>${esc(k)}</span><span class="muted small">${n}</span></div>`;
+      const list = (o, kind) => cast.filter(c => c.kind === kind && o[c.name]).map(c => row(c.name, o[c.name])).join("");
+      box.innerHTML = `<h3>In this scene</h3>${list(here, "person") || '<p class="small muted">No one on the list.</p>'}${list(here, "place") ? "<h3>Places</h3>" + list(here, "place") : ""}
+        <h3>In ${esc(E.ch ? E.ch.title : "this chapter")}</h3>${list(inCh, "person") || '<p class="small muted">No one on the list.</p>'}${list(inCh, "place") ? "<h3>Places</h3>" + list(inCh, "place") : ""}`;
     } else if (panelTab === "ref") {
       const files = await Store.listReference(book);
       if (refOpen && files.some(f => f.name === refOpen)) {
@@ -487,7 +496,7 @@
   function renderRail() {
     const book = E.book, el = $("#rail"); if (!book || !el) return;
     const cur = Forge.current(book);
-    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
+    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
       const done = Forge.isDone(book, s.key), blocked = !done && Forge.blockedBy(book, s.key);
       return `<button data-ft="${s.key}" class="${forgeTab === s.key ? "on" : ""} ${done ? "done" : s.key === cur ? "cur" : ""} ${blocked ? "blocked" : ""}" title="${done ? "Done" : s.key === cur ? "You are here" : blocked ? "Not ready: " + esc(blocked.item[1]) + " (" + blocked.stage.label + ")" : ""}">${done ? "✓ " : s.key === cur ? "● " : ""}${s.label}</button>`;
     }).join("");
@@ -498,8 +507,8 @@
     $("#ms-page").classList.toggle("hidden", on); $("#counts").classList.toggle("hidden", on);
     $$(".deskbar .btn").forEach(b => b.classList.toggle("hidden", on && b.id !== "tgp"));
     fv.classList.toggle("hidden", !on);
-    $("#where").textContent = on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
-    if (on) renderForge();
+    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
+    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (on) renderForge();
   }
   async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Copied. Paste it into the series' Claude Project chat."); } catch (e) { toast("Couldn't copy: select the text and copy it by hand."); } }
   function renderForge() {
@@ -536,6 +545,117 @@
       await Store.saveBook(book);
       if (book.lampTitle && s.lamp && Lamp.state === "ready") await Lamp.setStage(book.lampTitle, s.lamp, false);
       toast(`${s.label} reopened.`); renderRail(); renderForge();
+    }));
+  }
+
+  // ---------- reading the book's text for checks and cast ----------
+  async function scenesOf(book, chapters) {
+    const out = [];
+    for (const c of chapters || book.chapters) for (const sc of c.scenes) {
+      const md = E.sc && E.sc.id === sc.id && editorEl() ? Editor.htmlToMd(editorEl()) : (await Store.readScene(book, c, sc)).text;
+      out.push({ id: sc.id, ch: c.title, chId: c.id, title: sc.title, md });
+    }
+    return out;
+  }
+  async function goFind(sceneId, phrases) {
+    forgeTab = null; renderRail(); showForge();
+    if (!E.sc || E.sc.id !== sceneId) await openScene(sceneId);
+    const n = Checks.highlight(editorEl(), [].concat(phrases));
+    if (!n) toast("Opened the scene; the exact spot may have changed since the check.");
+  }
+
+  // ---------- the style checker ----------
+  let checkScope = localStorage.getItem("wd-check-scope") || "chapter", openSec = JSON.parse(localStorage.getItem("wd-check-open") || '["tells"]');
+  async function renderCheck() {
+    const book = E.book, fv = $("#forgeview");
+    fv.innerHTML = `<div class="fv-head"><h2>Style check</h2><span class="muted small">On this computer: no AI, no internet</span></div><p class="small muted">Working…</p>`;
+    await saveNow();
+    const chs = checkScope === "book" ? book.chapters : checkScope === "chapter" && E.ch ? [E.ch] : null;
+    const scenes = chs ? await scenesOf(book, chs) : E.sc ? (await scenesOf(book, [E.ch])).filter(x => x.id === E.sc.id) : [];
+    const pack = book.genre ? await Store.readPack(book.genre) : null;
+    const R = Checks.run(scenes, pack && pack.checks, (book.cast || []).flatMap(c => [c.name, ...(c.aliases || [])]).flatMap(n => n.split(" ")), chs ? chs.length : 1);
+    const fl = R.flesch, ease = fl >= 80 ? "very easy" : fl >= 70 ? "easy" : fl >= 60 ? "plain" : fl >= 50 ? "fairly hard" : "hard";
+    const ex = list => list.map(e => `<div class="ex"><span class="muted small">${esc(e.where)}</span> ${e.text ? esc(e.text) : `<i>${esc(e.find)}</i>`} <button class="btn small quiet" data-go="${esc(e.scene)}" data-find="${esc(e.find || "")}">Show</button></div>`).join("");
+    const sec = (key, title, count, body, note) => `<details class="csec" data-sec="${key}" ${openSec.includes(key) ? "open" : ""}><summary><b>${title}</b>${count != null ? ` <span class="badge ${count ? "" : "ok"}">${count}</span>` : ""}</summary>${note ? `<p class="small muted">${note}</p>` : ""}${body}</details>`;
+    const rowEx = (label, n, list, extra) => `<details class="crow"><summary><span>${label}</span><span class="muted small">${extra || ""}</span><b>${n}</b></summary>${ex(list)}</details>`;
+    const scopeName = checkScope === "book" ? "the whole book" : checkScope === "chapter" ? (E.ch ? E.ch.title : "this chapter") : (E.sc ? E.sc.title : "this scene");
+    fv.innerHTML = `<div class="fv-head"><h2>Style check</h2><span class="muted small">On this computer: no AI, no internet</span></div>
+      <div class="row chips">${[["scene", "This scene"], ["chapter", "This chapter"], ["book", "Whole book"]].map(([k, l]) => `<button class="btn small ${checkScope === k ? "primary" : "quiet"}" data-scope="${k}">${l}</button>`).join("")}<span class="spacer"></span><button class="btn small quiet" id="rerun">Check again</button></div>
+      ${!R.words ? `<p class="muted">No words in ${esc(scopeName)} yet.</p>` : `
+      <div class="tiles">
+        <div class="tile"><span>Words</span><b>${num(R.words)}</b><em>${esc(scopeName)}</em></div>
+        <div class="tile"><span>Readability</span><b>${Math.round(fl)}</b><em>${ease} · grade ${R.grade.toFixed(1)}</em></div>
+        <div class="tile"><span>Sentence</span><b>${R.avgSent.toFixed(1)}</b><em>words on average</em></div>
+        <div class="tile"><span>Dialogue</span><b>${R.dialoguePct}%</b><em>of the text</em></div>
+        <div class="tile"><span>Adverbs</span><b>${R.rates.adverbs.toFixed(1)}</b><em>per 1,000 words, narration</em></div>
+        <div class="tile"><span>AI tells</span><b>${R.tellList.reduce((a, t) => a + t.n, 0)}</b><em>in narration</em></div></div>
+      ${book.genre ? `<p class="small muted">Using the <b>${esc(book.genre)}</b> genre pack's extra tells and budgets.${pack ? "" : " (No pack file found for it: Settings › Genre packs.)"}</p>` : `<p class="small muted">Give the book a genre (Book tab) and the checker adds that genre pack's tells and budgets.</p>`}
+      ${sec("tells", "AI tells", R.tellList.reduce((a, t) => a + t.n, 0), R.tellList.map(t => rowEx(esc(t.k), t.n, t.ex)).join("") || '<p class="small">None found.</p>', "Stock phrases from Series Forge's list and your genre pack, in narration only. Dialogue is the character's voice.")}
+      ${sec("words", "Overused words", R.watchList.filter(w => w.over).length, `<div class="wgrid">${R.watchList.map(w => `<button class="wchip ${w.over ? "over" : ""}" data-word="${esc(w.w)}" title="${w.rate.toFixed(1)} per 1,000 words (watch above ${Checks.WATCH[w.w]})"><b>${esc(w.w)}</b> ${w.n}</button>`).join("")}</div>
+        <h4>Most used words</h4><div class="wgrid">${R.top.map(w => `<button class="wchip" data-word="${esc(w.w)}"><b>${esc(w.w)}</b> ${w.n}</button>`).join("")}</div>`, "Highlighted words are over the usual rate for fiction. Click any word to light it up in the open scene.")}
+      ${sec("repeat", "Repetition", R.echoList.length + R.repeats.length + R.starts.length, `
+        <h4>Echoes: the same word again within 40 words</h4>${R.echoList.map(e => rowEx(esc(e.w), e.n, e.ex.map(x => ({ ...x, find: e.w })))).join("") || '<p class="small">None.</p>'}
+        <h4>Repeated phrases (five words or more)</h4>${R.repeats.map(r => rowEx("“" + esc(r.k) + "”", r.n, r.where)).join("") || '<p class="small">None.</p>'}
+        <h4>Three sentences in a row starting the same way</h4>${R.starts.length ? ex(R.starts) : '<p class="small">None.</p>'}`, "Callbacks and catchphrases you meant are fine: these are candidates, not mistakes.")}
+      ${sec("pace", "Pacing and readability", R.longPara.length + R.longSent.length, `
+        <table class="ctable"><tr><th>Chapter</th><th>Words</th><th>Avg sentence</th><th>Variety</th><th>Avg paragraph</th><th>Dialogue</th></tr>${R.chapterRows.map(r => `<tr><td>${esc(r.ch)}</td><td>${num(r.words)}</td><td>${r.avgSent.toFixed(1)}</td><td title="How much sentence length varies. Low means a flat rhythm.">${r.variety < 5 ? '<span class="bad">' + r.variety.toFixed(1) + "</span>" : r.variety.toFixed(1)}</td><td>${r.avgPara.toFixed(0)} words</td><td>${r.dialoguePct}%</td></tr>`).join("")}</table>
+        <h4>Long narration paragraphs (over 4 sentences)</h4>${R.longPara.length ? ex(R.longPara) : '<p class="small">None.</p>'}
+        ${R.walls.length ? `<h4>Walls of text: three long paragraphs in a row</h4>${ex(R.walls)}` : ""}
+        <h4>Long sentences (over 35 words)</h4>${R.longSent.length ? ex(R.longSent) : '<p class="small">None.</p>'}`)}
+      ${sec("tags", "Dialogue tags", R.notSpeech.length + R.tagAdverbs.length, `
+        <p class="small">${num(R.tagsTotal)} tags on ${num(R.linesTotal)} lines of dialogue${R.linesTotal ? ` (${Math.round(100 * R.tagsTotal / R.linesTotal)}%)` : ""}.</p>
+        <div class="wgrid">${R.tagList.map(t => `<button class="wchip ${t.plain ? "" : "over"}" data-word="${esc(t.k)}"><b>${esc(t.k)}</b> ${t.n}</button>`).join("")}</div>
+        <h4>Not ways of speaking (smiled, laughed, shrugged… used as a tag)</h4>${R.notSpeech.length ? ex(R.notSpeech) : '<p class="small">None.</p>'}
+        <h4>Adverbs on tags</h4>${R.tagAdverbs.length ? ex(R.tagAdverbs) : '<p class="small">None.</p>'}`, "Said and asked disappear; everything else is highlighted so you can see how often you reach for it.")}
+      ${sec("style", "Style report", R.emDash.length + R.notXbutY.length, `
+        ${rowEx("Em-dashes", R.emDash.length, R.emDash.slice(0, 6), R.rates.emDash.toFixed(1) + " per 1,000")}
+        ${rowEx("“Not X, but Y”", R.notXbutY.length, R.notXbutY.slice(0, 6))}
+        ${rowEx("Passive voice (narration)", R.passive.length, R.passive.slice(0, 6), R.rates.passive.toFixed(1) + " per 1,000")}
+        <div class="crow plain"><span>Filter words (felt, saw, heard, realized…) in narration</span><b>${R.rates.filter.toFixed(1)} per 1,000</b></div>
+        <div class="crow plain"><span>Exclamation marks in narration</span><b>${R.exclaim}</b></div>`)}
+      ${R.budgetList.length ? sec("budgets", "Budgets from the genre pack", R.budgetList.filter(b => b.over).length, R.budgetList.map(b => `<div class="crow plain ${b.over ? "bad" : ""}"><span>${esc(b.k)}</span><b>${b.n} / ${b.lim}</b></div>`).join("")) : ""}`}`;
+    $$("[data-scope]", fv).forEach(b => b.onclick = () => { checkScope = b.dataset.scope; localStorage.setItem("wd-check-scope", checkScope); renderCheck(); });
+    $("#rerun", fv).onclick = () => renderCheck();
+    $$("details.csec", fv).forEach(d => d.ontoggle = () => { const k = d.dataset.sec; openSec = openSec.filter(x => x !== k); if (d.open) openSec.push(k); localStorage.setItem("wd-check-open", JSON.stringify(openSec)); });
+    $$("[data-go]", fv).forEach(b => b.onclick = guard(() => goFind(b.dataset.go, b.dataset.find)));
+    $$("[data-word]", fv).forEach(b => b.onclick = guard(async () => { forgeTab = null; renderRail(); showForge(); const n = Checks.highlight(editorEl(), [" " + b.dataset.word + " ", " " + b.dataset.word + ".", " " + b.dataset.word + ",", b.dataset.word + " "]); toast(n ? `“${b.dataset.word}” lit up in this scene (${n}). Typing clears it.` : `No “${b.dataset.word}” in this scene.`); }));
+  }
+
+  // ---------- people and places ----------
+  async function renderCast() {
+    const book = E.book, fv = $("#forgeview"); book.cast = book.cast || [];
+    fv.innerHTML = `<div class="fv-head"><h2>People &amp; places</h2></div><p class="small muted">Reading the book…</p>`;
+    await saveNow();
+    const scenes = await scenesOf(book);
+    const refs = await Store.listReference(book); let bible = "";
+    for (const r of refs) if (!/^Imported manuscript/i.test(r.name)) bible += "\n" + await Store.readReference(book, r.name);
+    const sug = Cast.suggest(bible, scenes.map(s => s.md), book.cast);
+    const counts = Cast.count(book.cast, scenes);
+    const byCh = book.chapters.map(c => { const o = {}; for (const sc of c.scenes) for (const [k, n] of Object.entries(counts[sc.id] || {})) o[k] = (o[k] || 0) + n; return o; });
+    const max = Math.max(1, ...byCh.flatMap(o => Object.values(o)));
+    const rowFor = c => {
+      const cells = byCh.map(o => o[c.name] || 0), seen = cells.map((n, i) => n ? i : -1).filter(i => i >= 0), total = cells.reduce((a, b) => a + b, 0);
+      let gap = 0, best = 0; for (let i = (seen[0] ?? cells.length); i < cells.length; i++) { gap = cells[i] ? 0 : gap + 1; best = Math.max(best, gap); }
+      const lastGap = seen.length ? cells.length - 1 - seen[seen.length - 1] : 0;
+      return `<tr><th><span class="cname">${esc(c.name)}</span>${(c.aliases || []).length ? `<span class="muted small"> · ${esc(c.aliases.join(", "))}</span>` : ""}</th>${cells.map((n, i) => `<td class="hc" style="--a:${n ? 0.15 + 0.85 * n / max : 0}" ${n ? `data-cell="${i}" data-name="${esc(c.name)}"` : ""} title="${esc(book.chapters[i].title)}: ${n}">${n || ""}</td>`).join("")}
+        <td>${total}</td><td class="small">${seen.length ? esc(book.chapters[seen[0]].title) : "—"}</td><td class="small ${lastGap >= 3 ? "bad" : ""}">${!seen.length ? "never appears" : lastGap >= 3 ? `gone for the last ${lastGap} chapters` : best >= 3 ? `a ${best}-chapter gap` : ""}</td>
+        <td><button class="btn small quiet" data-edit="${esc(c.name)}" title="Aliases">✎</button><button class="btn small quiet" data-del="${esc(c.name)}" title="Take off the list">✕</button></td></tr>`;
+    };
+    const table = kind => { const cs = book.cast.filter(c => c.kind === kind); return cs.length ? `<div class="hscroll"><table class="ctable heat"><tr><th>${kind === "person" ? "People" : "Places"}</th>${book.chapters.map((c, i) => `<th title="${esc(c.title)}">${i + 1}</th>`).join("")}<th>Total</th><th>First</th><th></th><th></th></tr>${cs.map(rowFor).join("")}</table></div>` : ""; };
+    fv.innerHTML = `<div class="fv-head"><h2>People &amp; places</h2><span class="muted small">When and how often each one turns up, chapter by chapter</span></div>
+      ${book.cast.length ? table("person") + table("place") + `<p class="small muted">Click a number to open the first scene in that chapter where the name turns up.</p>` : `<p>No one's on the list yet. Keep the suggestions below with one click.</p>`}
+      ${sug.length ? `<div class="card sugg"><h3>Suggested</h3><p class="small muted">From the bible and codex on the reference shelf, and from names that keep turning up in the manuscript. Untick anything that isn't a person or a place.</p>
+        <div class="found">${sug.map((c, i) => `<label class="check"><input type="checkbox" data-s="${i}" ${c.from === "bible" || c.kind === "place" ? "checked" : ""}> <span class="grow"><b>${esc(c.name)}</b>${c.aliases.length ? ` <span class="muted small">also ${esc(c.aliases.join(", "))}</span>` : ""}</span><select data-k="${i}"><option value="person" ${c.kind === "person" ? "selected" : ""}>person</option><option value="place" ${c.kind === "place" ? "selected" : ""}>place</option></select><span class="muted small">${c.from}</span></label>`).join("")}</div>
+        <button class="btn primary" id="keep">Keep the ticked ones</button></div>` : ""}
+      <form class="row" id="addn"><input id="nn" placeholder="Add a name"><select id="nk"><option value="person">person</option><option value="place">place</option></select><button class="btn small">Add</button></form>`;
+    const save = async () => { await Store.saveBook(book); renderCast(); };
+    $("#keep") && ($("#keep").onclick = guard(async () => { for (const c of $$("[data-s]", fv)) if (c.checked) { const x = sug[+c.dataset.s]; book.cast.push({ name: x.name, aliases: x.aliases, kind: $(`[data-k="${c.dataset.s}"]`, fv).value }); } await save(); }));
+    $("#addn").onsubmit = guard(async e => { e.preventDefault(); const n = $("#nn").value.trim(); if (!n || book.cast.some(c => c.name === n)) return; book.cast.push({ name: n, aliases: n.includes(" ") ? [n.split(" ")[0]] : [], kind: $("#nk").value }); await save(); });
+    $$("[data-del]", fv).forEach(b => b.onclick = guard(async () => { book.cast = book.cast.filter(c => c.name !== b.dataset.del); await save(); }));
+    $$("[data-edit]", fv).forEach(b => b.onclick = guard(async () => { const c = book.cast.find(x => x.name === b.dataset.edit); const v = await promptBox(`Other names for ${c.name} (commas between)`, (c.aliases || []).join(", ")); if (v == null) return; c.aliases = v.split(",").map(x => x.trim()).filter(Boolean); await save(); }));
+    $$("[data-cell]", fv).forEach(td => td.onclick = guard(async () => {
+      const ch = book.chapters[+td.dataset.cell], c = book.cast.find(x => x.name === td.dataset.name);
+      const sc = ch.scenes.find(s => (counts[s.id] || {})[c.name]); if (sc) await goFind(sc.id, [c.name, ...(c.aliases || [])]);
     }));
   }
 
@@ -599,6 +719,25 @@
       } });
   }
 
+  async function editPack(g) {
+    const p = (await Store.readPack(g)) || { text: "", checks: { tells: [], budgets: {}, ignore: [] } };
+    await modal(`<h2>${esc(g)} genre pack</h2>
+      <form id="pk"><label class="wide">The pack<textarea id="pt" class="packtext">${esc(p.text)}</textarea></label>
+      <div class="row"><label class="btn small file-btn">Replace from a file (.docx, .md)…<input type="file" id="pf2" accept=".docx,.md,.txt" hidden></label><span class="small muted">The old copy is kept in Genre Packs › Previous.</span></div>
+      <h3>For the style checker</h3><div class="two">
+        <label>Extra AI tells and stock phrases, one per line<textarea id="ptl">${esc((p.checks.tells || []).join("\n"))}</textarea></label>
+        <label>Budgets, one per line: <i>phrase: times per chapter</i><textarea id="pbu">${esc(Object.entries(p.checks.budgets || {}).map(([k, v]) => k + ": " + v).join("\n"))}</textarea></label></div>
+      <label class="wide">Lines that legitimately repeat (sign-on, sign-off, status-screen headers), one per line<textarea id="pig">${esc((p.checks.ignore || []).join("\n"))}</textarea></label>
+      <div class="row end"><button type="button" class="btn quiet" data-close>Cancel</button><button class="btn primary">Save pack</button></div></form>`,
+      { wide: true, mount: (d, close) => {
+        $("#pf2", d).onchange = guard(async e => { const f = e.target.files[0]; if (f) $("#pt", d).value = await readAnyText(f); });
+        $("#pk", d).onsubmit = guard(async e => { e.preventDefault();
+          const lines = id => $(id, d).value.split("\n").map(x => x.trim()).filter(Boolean);
+          const budgets = {}; for (const l of lines("#pbu")) { const m = l.match(/^(.+?)\s*[:=]\s*(\d+(?:\.\d+)?)$/); if (m) budgets[m[1].trim()] = +m[2]; }
+          await Store.savePack(g, $("#pt", d).value, { tells: lines("#ptl"), budgets, ignore: lines("#pig") }); close(true); toast("Pack saved."); });
+      } });
+  }
+
   // ---------- settings ----------
   function viewSettings() {
     const S = Store.settings;
@@ -611,6 +750,8 @@
         <p class="small muted">The themes come straight from the Lamp Room, so a theme added there shows up here too.</p></div>
       <div class="card"><h3>Writers and pen names</h3><div id="wr"></div><button class="btn small" id="addw">+ Writer</button>
         <p class="small muted">Each book is filed under a writer and a pen name. The bookshelf can filter by either.</p></div>
+      <div class="card"><h3>Genre packs</h3><p class="small muted">The master copies, in your library's <i>Genre Packs</i> folder. A book's genre (Book tab) decides which pack the style checker uses. Each pack also holds its own extra tells, budgets and ignored lines.</p>
+        <div id="packs" class="packs"></div><button class="btn small quiet" id="addpack">+ Genre</button></div>
       <div class="card"><h3>Lamp Room</h3>${Lamp.state === "ready" ? `<p>Connected to <b>${esc(Lamp.name())}</b>: ${Lamp.titles.length} writing project${Lamp.titles.length === 1 ? "" : "s"}.</p>` : Lamp.state === "needs-permission" ? `<p>The Lamp Room library this browser uses, <b>${esc(Lamp.name())}</b>, needs your OK.</p>` : `<p>Not connected yet.</p>`}
         <div class="row">${Lamp.state === "ready" ? "" : `<button class="btn primary" id="lampc">${Lamp.state === "needs-permission" ? "Connect the Lamp Room library" : "Choose the Lamp Room library…"}</button>`}${Store.testMode ? "" : `<button class="btn quiet" id="lampn">Use a different folder…</button>`}</div>
         <p class="small muted">New books can go into your Lamp Room writing projects at the same time, and writing projects there can be opened here. The Desk only touches writing projects: their title, series, pen name and cover. It never changes audio projects, stages, hours or dates.</p></div>
@@ -642,6 +783,9 @@
       if (window.showSaveFilePicker) { try { const h = await showSaveFilePicker({ suggestedName: name, types: [{ description: "Zip", accept: { "application/zip": [".zip"] } }] }); const w = await h.createWritable(); await w.write(blob); await w.close(); toast("Backup saved."); } catch (e) { if (e.name !== "AbortError") throw e; } }
       else { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
     });
+    const drawPacks = guard(async () => { const ps = await Store.listPacks(); $("#packs").innerHTML = ps.map(g => `<button class="reffile" data-pack="${esc(g)}"><b>${esc(g)}</b><span class="muted small">${Store.books.filter(b => b.genre === g).length} book(s)</span></button>`).join(""); $$("[data-pack]").forEach(b => b.onclick = guard(() => editPack(b.dataset.pack).then(drawPacks))); });
+    drawPacks();
+    $("#addpack").onclick = guard(async () => { const g = await promptBox("New genre", "", "Add"); if (!g) return; await Store.savePack(g, `# ${g} genre pack\n`, { tells: [], budgets: {}, ignore: [] }); drawPacks(); });
     $("#lampc") && ($("#lampc").onclick = guard(async () => { await Lamp.connect(); toast("Lamp Room library connected."); viewSettings(); }));
     $("#lampn") && ($("#lampn").onclick = guard(async () => { await Lamp.connect(true); toast("Lamp Room library connected."); viewSettings(); }));
     $("#chg") && ($("#chg").onclick = guard(async () => { await Store.pickFolder(); applyLook(); chip("folderchip", "📁 " + Store.folderName()); location.hash = "#/shelf"; }));
