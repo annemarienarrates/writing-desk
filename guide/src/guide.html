@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>The Writing Desk — Guide</title>
+<link rel="stylesheet" href="print.css"><link rel="icon" href="data:,">
+<style>
+  /* cover */
+  .cover { background: radial-gradient(900px 700px at 50% 30%, #4a3022 0%, var(--walnut) 55%, #1d130e 100%); color: #f3e7d0; }
+  .cover .frame { border-color: #a8732a88; } .cover .frame::after { border-color: #a8732a44; }
+  .cover .in { position: absolute; inset: .9in .9in .8in; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .cover .mark { font: 600 8pt var(--sans); letter-spacing: .4em; text-transform: uppercase; color: var(--brass2); margin-top: .35in; }
+  .cover .nib { margin-top: .9in; filter: drop-shadow(0 0 28px #c99a4f55); }
+  .cover h1 { font-size: 58pt; line-height: .95; letter-spacing: -.015em; margin-top: .45in; font-weight: 400; }
+  .cover h1 i { display: block; font-size: 30pt; color: var(--brass2); font-weight: 300; margin-bottom: 6px; letter-spacing: 0; }
+  .cover .rule { width: 2.6in; height: 1px; margin: .35in auto .3in; background: linear-gradient(90deg, transparent, var(--brass2), transparent); }
+  .cover .sub { font: italic 500 17pt/1.35 var(--italic); color: #e6d6b8; max-width: 4.8in; }
+  .cover .foot { margin-top: auto; display: flex; justify-content: space-between; width: 100%; font: 500 8pt var(--sans); letter-spacing: .14em; text-transform: uppercase; color: #b9a283; border-top: 1px solid #a8732a55; padding-top: 12px; }
+  /* contents */
+  .toc h2 { font-size: 30pt; font-weight: 400; } .toc h2 i { color: var(--ox); }
+  .toc .lead { font: italic 500 14pt/1.4 var(--italic); color: var(--mid); margin: 6px 0 22px; max-width: 5.4in; }
+  .toc .rows { columns: 2; column-gap: .45in; }
+  .toc .r { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px dotted var(--line); break-inside: avoid; font-size: 10.5pt; }
+  .toc .r .n { font: 600 8.5pt var(--sans); color: var(--ox); width: 22px; }
+  .toc .r .t { flex: 1; } .toc .r .p { font: 500 10pt var(--serif); color: var(--brass); }
+  .road { margin-top: .4in; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 18px; }
+  .road h3 { font: 600 8pt var(--sans); letter-spacing: .22em; text-transform: uppercase; color: var(--ox); margin-bottom: 4px; }
+  .road p { margin: 0 0 12px; color: var(--mid); font-size: 9.5pt; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { font: 600 8.5pt var(--sans); padding: 4px 10px; border-radius: 99px; background: var(--paper2); border: 1px solid var(--line); color: var(--ink); }
+  .chip.st { background: #7c2d2214; border-color: #7c2d2244; color: var(--ox); }
+  .chips .arr { color: var(--brass); font-size: 9pt; }
+  .road .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  /* sections */
+  .s { margin-bottom: .26in; }
+  .sh { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: end; padding-bottom: 8px; border-bottom: 1.5px solid var(--ox); margin-bottom: 12px; }
+  .sh .num { font: 300 34pt/0.9 var(--serif); color: var(--brass); }
+  .sh h2 { font-size: 20pt; line-height: 1.1; }
+  .sh .lead { font: italic 500 12.5pt/1.3 var(--italic); color: var(--mid); margin: 3px 0 0; }
+  .sh .ic { font-size: 20pt; padding-bottom: 2px; }
+  .s.cont .sh { grid-template-columns: 1fr; border-bottom-width: 1px; } .s.cont .sh h2 { font-size: 12pt; color: var(--muted); }
+  figure { margin: 0 0 14px; }
+  figure img { display: block; width: 100%; max-height: 2.85in; object-fit: cover; object-position: top; border-radius: 8px; border: 1px solid var(--line); box-shadow: 0 10px 24px -14px #2a221d88; }
+  figure.slim img { width: 100%; }
+  figcaption { font: italic 500 10.5pt var(--italic); color: var(--muted); margin-top: 6px; text-align: center; }
+  .steps { display: flex; flex-direction: column; gap: 7px; margin: 0 0 12px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px 8px 9px; }
+  .step b { width: 22px; height: 22px; border-radius: 50%; background: var(--ox); color: #f7f1e5; display: grid; place-items: center; font: 700 9pt var(--sans); margin-top: 1px; }
+  .step p { margin: 0; }
+  .items { display: flex; flex-direction: column; }
+  .it { display: grid; grid-template-columns: 1.55in 1fr; gap: 14px; padding: 6px 0; border-top: 1px dotted var(--line); }
+  .it:first-child { border-top: 0; }
+  .it dt { font: 600 9.5pt var(--sans); color: var(--ox); }
+  .it dd { margin: 0; }
+  .kg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .kbox { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 8px; }
+  .kbox h3 { font: 600 8pt var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--ox); margin-bottom: 6px; }
+  .kr { display: grid; grid-template-columns: 1.2in 1fr; gap: 8px; padding: 4px 0; border-top: 1px dotted var(--line); align-items: baseline; }
+  .kr:first-of-type { border-top: 0; }
+  .kr .say { font: italic 500 11.5pt var(--italic); }
+  /* back cover */
+  .back { background: radial-gradient(900px 700px at 50% 60%, #4a3022 0%, var(--walnut) 55%, #1d130e 100%); color: #e9dcc3; }
+  .back .frame { border-color: #a8732a88; } .back .frame::after { border-color: #a8732a44; }
+  .back .in { position: absolute; inset: 2.6in 1.2in auto; text-align: center; }
+  .back h2 { font-size: 26pt; font-weight: 400; color: #f3e7d0; }
+  .back p { font: italic 500 14pt/1.45 var(--italic); color: #d8c6a6; margin: 14px auto 0; max-width: 4.6in; }
+  .back .q { display: inline-block; margin-top: 28px; width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--brass2); font: 600 22pt/52px var(--serif); color: var(--brass2); }
+  .back .foot { position: absolute; bottom: .75in; left: 0; right: 0; text-align: center; font: 500 8pt var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #a8916f; }
+</style></head>
+<body>
+<div id="out"></div>
+<script src="../../js/help.js"></script>
+<script>
+(async function () {
+  await document.fonts.ready;
+  await Promise.all(["settings","shelf","new","desk","stats","forge","check","timeline","build","kit","voices"].map(n => new Promise(r => { const i = new Image(); i.onload = i.onerror = r; i.src = "../img/" + n + ".jpg"; })));
+  await Promise.all([...document.fonts].map(f => f.load().catch(() => 0)));
+  const pc = /[?&]pc\b/.test(location.search), H = WDHelp.get(pc), sw = s => pc ? WDHelp.swap(s) : s;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+  const FIG = {
+    start: ["settings", "Settings: your writers and pen names, the look, and the Lamp Room link."],
+    shelf: ["shelf", "The bookshelf. Each series stands on its own shelf under a brass plaque."],
+    newbook: ["new", "New book: start with a blank page, or bring in a Word file."],
+    writing: ["desk", "The Desk: chapters and scenes on the left, the page, and the side panel on the right."],
+    stats: ["stats", "The stats bar, with the tool tabs and the Forge stages underneath."],
+    forge: ["forge", "A Forge stage: a short note, the checklist, and the prompt for Claude."],
+    check: ["check", "Check: findings grouped by kind, each one a click away from the page."],
+    cast: ["timeline", "The timeline: one line per scene, with the day it happens."],
+    build: ["build", "Build: matter on the left, the look, and a live preview."],
+    kit: ["kit", "The kit: every store field, with its limit and a Copy button."],
+    voices: ["voices", "Voices: duet or full cast, readers, and every line of dialogue."]
+  };
+  const edition = pc ? "Windows edition" : "Mac edition", month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const nib = (w, c1, c2) => `<svg class="orn nib" width="${w}" viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
+    <path d="M60 146 L34 82 Q27 64 37 46 L48 14 Q60 2 72 14 L83 46 Q93 64 86 82 Z" fill="url(#g)"/>
+    <path d="M60 146 L60 74" stroke="#2f2019" stroke-width="2.4" stroke-linecap="round"/><circle cx="60" cy="68" r="6.5" fill="#2f2019"/>
+    <path d="M44 40 Q60 32 76 40" stroke="#2f201955" stroke-width="1.6" fill="none"/>
+    <path d="M8 120 Q30 112 44 126 M112 120 Q90 112 76 126" stroke="${c1}" stroke-width="1.2" fill="none" opacity=".7"/>
+    <circle cx="8" cy="120" r="2.2" fill="${c1}"/><circle cx="112" cy="120" r="2.2" fill="${c1}"/></svg>`;
+  const out = document.getElementById("out");
+  // ---- cover
+  out.appendChild(el(`<div class="page cover"><div class="frame"></div><div class="in">
+    <div class="mark">The Writing Desk · Guide</div>${nib(120, "#e2b971", "#9a6a2a")}
+    <h1><i>A guide to</i>The Writing Desk</h1><div class="rule"></div>
+    <div class="sub">Writing, shaping and shipping your books, from the first blank page to launch day. In plain words, one step at a time.</div>
+    <div class="foot"><span>annemarienarrates.github.io/writing-desk</span><span>${edition} · ${month}</span></div></div></div>`));
+  // ---- contents (page numbers filled in after packing)
+  const toc = el(`<div class="page paper"><div class="frame"></div><div class="runhead"><span><b>The Writing Desk</b> · Guide</span><span>Contents</span></div><div class="body toc">
+    <h2>What's <i>inside</i></h2><p class="lead">New here? Read the first section and you're writing in five minutes. Everything after it is for when you need it.</p>
+    <div class="rows">${H.map((s, i) => `<div class="r"><span class="n">${String(i + 1).padStart(2, "0")}</span><span class="t">${s.icon} ${esc(s.title)}</span><span class="p" data-p="${s.id}"></span></div>`).join("")}</div>
+    <div class="road"><h3>How a book moves through the Desk</h3><p>The Forge stages are the road. Each one has a checklist, a prompt for Claude, and a gate before the next.</p>
+      <div class="chips">${["Setup", "Outline", "Draft", "Revise", "Edit", "Format", "Publish", "Market"].map(s => `<span class="chip st">${s}</span>`).join('<span class="arr">›</span>')}</div>
+      <p style="margin:14px 0 8px">The tools sit beside the stages. Use them whenever you like:</p>
+      <div class="chips">${["✎ Manuscript", "✓ Check", "👥 Cast", "🕰 Timeline", "📖 Build", "🏷 Kit", "🎙 Voices"].map(s => `<span class="chip">${s}</span>`).join("")}</div></div>
+    </div><div class="folio">2</div></div>`);
+  out.appendChild(toc);
+  // ---- pages
+  let pageNo = 2, area;
+  const newPage = () => { pageNo++; const p = el(`<div class="page paper"><div class="frame"></div><div class="runhead"><span><b>The Writing Desk</b> · Guide</span><span>${edition}</span></div><div class="body"></div><div class="folio">${pageNo}</div></div>`); out.appendChild(p); area = p.querySelector(".body"); };
+  const over = () => area.scrollHeight > area.clientHeight + 1;
+  const units = s => {
+    const u = [];
+    if (s.steps) s.steps.forEach((t, i) => u.push(["steps", `<div class="step"><b>${i + 1}</b><p>${esc(t)}</p></div>`]));
+    if (s.items) s.items.forEach(([k, v]) => u.push(["items", `<div class="it"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`]));
+    if (s.keys) u.push(["keys", `<div class="kg"><div class="kbox"><h3>Keys</h3>${s.keys.map(([k, d]) => `<div class="kr"><span><kbd>${esc(k)}</kbd></span><span>${esc(d)}</span></div>`).join("")}</div>
+      <div class="kbox"><h3>Say it while dictating</h3>${s.spoken.map(([k, d]) => `<div class="kr"><span class="say">“${esc(k)}”</span><span>${esc(d)}</span></div>`).join("")}</div></div>`]);
+    return u;
+  };
+  newPage();
+  H.forEach((s, i) => {
+    const f = FIG[s.id];
+    const head = `<div class="sh"><span class="num">${String(i + 1).padStart(2, "0")}</span><div><h2>${esc(s.title)}</h2>${s.lead ? `<p class="lead">${esc(s.lead)}</p>` : ""}</div><span class="ic">${s.icon}</span></div>`
+      + (f ? `<figure><img src="../img/${f[0]}.jpg" alt=""><figcaption>${esc(sw(f[1]))}</figcaption></figure>` : "");
+    let sec = el(`<section class="s">${head}</section>`);
+    const U = units(s);
+    const add = (kind, html) => { let box = sec.lastElementChild; if (!box || !box.classList.contains(kind)) { box = el(`<div class="${kind}"></div>`); sec.appendChild(box); } const n = el(html); box.appendChild(n); return n; };
+    // whole section where it fits; else on a fresh page; only split when it can't fit on a page of its own
+    area.appendChild(sec); U.forEach(u => add(...u));
+    if (over()) { sec.remove(); if (area.children.length) newPage(); area.appendChild(sec); }
+    const split = over();
+    if (split) { sec.remove(); sec = el(`<section class="s">${head}</section>`); area.appendChild(sec); if (U[0]) add(...U[0]); }
+    document.querySelectorAll(`[data-p="${s.id}"]`).forEach(x => x.textContent = pageNo);
+    if (split) for (const u of U.slice(1)) {
+      const n = add(...u);
+      if (over()) {
+        const box = n.parentElement; n.remove(); if (!box.children.length) box.remove();
+        newPage(); sec = el(`<section class="s cont"><div class="sh"><h2>${s.icon} ${esc(s.title)}, continued</h2></div></section>`); area.appendChild(sec); add(...u);
+      }
+    }
+  });
+  // ---- back cover
+  out.appendChild(el(`<div class="page back"><div class="frame"></div><div class="in">${nib(70, "#e2b971", "#9a6a2a")}
+    <h2 style="margin-top:22px">The guide lives in the Desk, too.</h2>
+    <p>Click the <b style="font-style:normal">?</b> in the top bar for every page of this guide, a quick-start sheet, and the latest edition to download.</p>
+    <div class="q">?</div></div><div class="foot">The Writing Desk · ${edition} · ${month}</div></div>`));
+  document.body.dataset.ready = "1";
+})();
+</script>
+</body></html>

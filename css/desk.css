@@ -294,3 +294,11 @@ body.on-shelf .shelf-row:has(.lampspine) { --row: 385px; }
 .vline .vtext:not([style]) { color: var(--ink); }
 .vhow { grid-column: 2 / 5; }
 .vtone { font-size: 12px; }
+/* ? help */
+.wd-help .hp-steps { margin: 0 0 14px; padding: 0; list-style: none; counter-reset: st; display: flex; flex-direction: column; gap: 8px; }
+.wd-help .hp-steps li { counter-increment: st; display: grid; grid-template-columns: 30px 1fr; gap: 10px; line-height: 1.5; }
+.wd-help .hp-steps li::before { content: counter(st); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 13px var(--sans); color: var(--bg, #fff); background: var(--accent); }
+.wd-help .hp-k.wide { grid-template-columns: 1fr auto; }
+.wd-help .hp-dl-btns a.small { text-align: center; margin-top: 2px; }
+.wd-help h1 { margin-bottom: 4px; }
+#nav a[data-r="help"] { font-weight: 700; min-width: 2em; text-align: center; }

@@ -1,0 +1,28 @@
+/* The Writing Desk — printed guides. Paper, ink, oxblood and brass. */
+@font-face { font-family: "Fraunces"; src: url("../../../lamp-room/fonts/fraunces-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "Fraunces"; src: url("../../../lamp-room/fonts/fraunces-latin-wght-italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; }
+@font-face { font-family: "Cormorant"; src: url("../../../lamp-room/fonts/cormorant-garamond-latin-500-italic.woff2") format("woff2"); font-weight: 500; font-style: italic; }
+@page { size: Letter; margin: 0; }
+:root {
+  --paper: #f7f1e5; --paper2: #efe6d4; --card: #fbf8f1; --ink: #2a221d; --mid: #54483e; --muted: #8a7b6c; --line: #ddd0b8;
+  --ox: #7c2d22; --ox2: #9b3b2c; --brass: #a8732a; --brass2: #c99a4f; --walnut: #2f2019; --walnut2: #46301f;
+  --serif: "Fraunces", Georgia, serif; --sans: "DM Sans", "Fira Sans", Helvetica, Arial, sans-serif; --italic: "Cormorant", "Fraunces", Georgia, serif;
+  --mono: "DejaVu Sans Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { margin: 0; background: #ccc; }
+body { font: 10pt/1.5 var(--sans); color: var(--ink); }
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; margin: 0; }
+.page { width: 8.5in; height: 11in; position: relative; overflow: hidden; background: var(--paper); margin: 0 auto; page-break-after: always; break-after: page; }
+.page:last-child { page-break-after: auto; break-after: auto; }
+.page.paper::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(1200px 700px at 0% 0%, #fffaf0 0%, transparent 55%), radial-gradient(900px 600px at 100% 100%, #eadfc8 0%, transparent 60%); }
+.frame { position: absolute; inset: .28in; border: 1px solid var(--line); pointer-events: none; }
+.frame::after { content: ""; position: absolute; inset: 4px; border: .5px solid var(--line); }
+.body { position: absolute; top: .78in; bottom: .72in; left: .78in; right: .78in; }
+.runhead { position: absolute; top: .42in; left: .78in; right: .78in; display: flex; justify-content: space-between; font: 600 7pt var(--sans); letter-spacing: .26em; text-transform: uppercase; color: var(--muted); }
+.runhead b { color: var(--ox); font-weight: 700; }
+.folio { position: absolute; bottom: .4in; left: 0; right: 0; text-align: center; font: 500 9pt var(--serif); color: var(--brass); letter-spacing: .1em; }
+.folio::before, .folio::after { content: "—"; margin: 0 8px; color: var(--line); }
+kbd { font: 600 8pt var(--mono); background: var(--card); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; color: var(--ink); white-space: nowrap; }
+.orn { display: block; margin: 0 auto; }

@@ -149,7 +149,7 @@
     document.body.classList.toggle("on-desk", route.name === "book");
     applyShelfWall(route.name === "shelf");
     if (route.name !== "book") { E.book = E.sc = E.ch = null; setSaved(""); }
-    ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook, series: viewSeries }[route.name] || viewShelf)();
+    ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook, series: viewSeries, help: viewHelp }[route.name] || viewShelf)();
   }
   addEventListener("hashchange", guard(go));
 
@@ -158,7 +158,8 @@
     let st;
     try { st = await Store.init(); } catch (e) { st = "error"; console.error(e); }
     if (st === "ready") return ready();
-    const box = (body) => main.innerHTML = `<div class="gate card"><h1>The Writing Desk</h1>${body}</div>`;
+    if (location.hash.startsWith("#/help")) { viewHelp(); addEventListener("hashchange", () => location.hash.startsWith("#/help") || location.reload(), { once: true }); return; }
+    const box = (body) => main.innerHTML = `<div class="gate card"><h1>The Writing Desk</h1>${body}<p class="small muted"><a href="#/help">New here? Read the guide first.</a></p></div>`;
     if (st === "unsupported") return box(`<p>The Writing Desk works in <b>Google Chrome</b> on a Mac or PC: it's the browser that lets a web page work directly in a folder you choose. Open this page in Chrome.</p>`);
     if (st === "needs-permission") {
       box(`<p>Welcome back. Chrome needs your OK to open your library folder, <b>${esc(Store.folderName())}</b>, again.</p><div class="row"><button class="btn primary" id="reopen">Open my library</button><button class="btn quiet" id="pick">Choose a different folder</button></div>`);
@@ -1078,6 +1079,27 @@
   }
 
   // ---------- history: earlier versions of the open scene ----------
+  // ---------- ? : the guide (same words as the PDF, from js/help.js) ----------
+  function viewHelp() {
+    const pc = WDHelp.isPC(), H = WDHelp.get(pc), ed = pc ? " (PC)" : "";
+    const body = s => {
+      let h = s.lead ? `<p class="hp-lead">${esc(s.lead)}</p>` : "";
+      if (s.steps) h += `<ol class="hp-steps">${s.steps.map(t => `<li>${esc(t)}</li>`).join("")}</ol>`;
+      if (s.items) h += `<dl class="hp-dl">${s.items.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+      if (s.keys) h += `<div class="hp-keys"><div><h3>Keys</h3>${s.keys.map(([k, d]) => `<div class="hp-k"><kbd>${esc(k)}</kbd><span>${esc(d)}</span></div>`).join("")}</div>
+        <div><h3>Say it while dictating</h3>${s.spoken.map(([k, d]) => `<div class="hp-k wide"><span>“${esc(k)}”</span><span class="muted">${esc(d)}</span></div>`).join("")}</div></div>`;
+      return h;
+    };
+    main.innerHTML = `<div class="hp wd-help"><aside class="hp-nav"><div class="section-label">Guide</div>${H.map(s => `<a href="#" data-go="hp-${s.id}">${s.icon} ${esc(s.title)}</a>`).join("")}
+        <div class="hp-dl-btns"><div class="section-label">Take it with you</div>
+          <a class="btn small primary" href="guide/The Writing Desk Guide${ed}.pdf" download>📄 The full guide (PDF)</a>
+          <a class="btn small" href="guide/The Writing Desk Quick Start${ed}.pdf" download>✦ One-page quick start</a>
+          <a class="small muted" href="guide/The Writing Desk Guide${pc ? "" : " (PC)"}.pdf" download>${pc ? "Mac" : "Windows"} edition of the guide</a></div></aside>
+      <div class="hp-main"><h1>How the Writing Desk works</h1><p class="hp-lead">Start with the first section if you're new. After that, jump to whatever you're stuck on.</p>
+        ${H.map(s => `<section class="hp-sec" id="hp-${s.id}"><h2>${s.icon} ${esc(s.title)}</h2>${body(s)}</section>`).join("")}</div></div>`;
+    $$("[data-go]").forEach(a => a.onclick = e => { e.preventDefault(); const t = document.getElementById(a.dataset.go); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  }
+
   async function showHistory() {
     const { book, ch, sc } = E; if (!sc) return;
     await saveNow();

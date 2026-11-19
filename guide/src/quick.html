@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>The Writing Desk — Quick Start</title>
+<link rel="stylesheet" href="print.css"><link rel="icon" href="data:,">
+<style>
+  .band { position: absolute; top: 0; left: 0; right: 0; height: 2.05in; background: radial-gradient(700px 300px at 20% 0%, #4a3022 0%, var(--walnut) 60%, #1d130e 100%); color: #f3e7d0; padding: .5in .7in 0; display: flex; gap: 22px; align-items: center; }
+  .band .mark { font: 600 7.5pt var(--sans); letter-spacing: .36em; text-transform: uppercase; color: var(--brass2); }
+  .band h1 { font-size: 34pt; font-weight: 400; line-height: 1; margin-top: 6px; } .band h1 i { color: var(--brass2); font-weight: 300; }
+  .band p { font: italic 500 13pt var(--italic); color: #d8c6a6; margin: 6px 0 0; }
+  .qb { position: absolute; top: 2.35in; left: .7in; right: .7in; bottom: .75in; display: grid; grid-template-columns: 1.15fr 1fr; gap: .32in; }
+  h2 { font-size: 15pt; border-bottom: 1.5px solid var(--ox); padding-bottom: 4px; margin-bottom: 10px; } h2 i { color: var(--ox); }
+  .step { display: grid; grid-template-columns: 24px 1fr; gap: 9px; margin-bottom: 8px; font-size: 9.5pt; line-height: 1.42; }
+  .step b { width: 21px; height: 21px; border-radius: 50%; background: var(--ox); color: #f7f1e5; display: grid; place-items: center; font: 700 8.5pt var(--sans); }
+  .step p { margin: 0; } .step em { font-style: normal; font-weight: 600; color: var(--ox); }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px; margin-bottom: 14px; font-size: 9pt; }
+  .row { display: grid; grid-template-columns: 1.05in 1fr; gap: 8px; padding: 3px 0; border-top: 1px dotted var(--line); }
+  .keys .row { grid-template-columns: 1.35in 1fr; }
+  .row:first-of-type { border-top: 0; } .row b { font-weight: 600; color: var(--ox); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0 6px; }
+  .chip { font: 600 7.5pt var(--sans); padding: 3px 8px; border-radius: 99px; background: #7c2d2214; border: 1px solid #7c2d2244; color: var(--ox); } .arr { color: var(--brass); font-size: 8pt; }
+  .tip { font: italic 500 11pt/1.35 var(--italic); color: var(--mid); text-align: center; margin-top: 4px; }
+  .foot { position: absolute; bottom: .42in; left: .7in; right: .7in; display: flex; justify-content: space-between; font: 500 7.5pt var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+</style></head>
+<body>
+<div id="out"></div>
+<script src="../../js/help.js"></script>
+<script>
+(async function () {
+  const pc = /[?&]pc\b/.test(location.search), sw = s => pc ? WDHelp.swap(s) : s;
+  const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const steps = [
+    "Open the Desk in <em>Google Chrome</em>. Bookmark it.",
+    "Click <em>Choose library folder</em>. In Documents make a <em>New Folder</em> called Writing Desk Library (not in Google Drive), select it, click <em>Open</em>, then <em>Edit files</em>.",
+    "<em>Settings ▸ Writers</em>: add yourself, your pen names, a monthly goal and your pace.",
+    "<em>New book</em>: type the title and pick writer, pen name and genre. Or choose your Word file to import it, with your bible and codex files beside it.",
+    "Click the cover on the shelf. Pick a scene on the left and write. It saves itself a second after you stop.",
+    "Click the bright <em>Forge stage</em> along the top. Tick the checklist, copy the prompt into the series' Claude Project, mark the stage done.",
+    "Before a big change: <em>🔒 Seal</em> the chapter or book, and <em>Settings ▸ Back up library…</em>"
+  ];
+  const tools = [["✎ Manuscript", "Write. Chapters and scenes on the left."], ["✓ Check", "Style report: AI tells, repeats, pacing, tags."], ["👥 Cast", "Who's in which scene, continuity flags."], ["🕰 Timeline", "The day each scene happens."], ["📖 Build", "EPUB (Steel or Filigree) and Word for D2D."], ["🏷 Kit", "Store details with limits and Copy buttons."], ["🎙 Voices", "Narration scripts, or send to the Lamp Room."]];
+  const nets = [["Autosave", "A second after you stop typing. ⌘S if you like."], ["History", "Earlier versions of every scene."], ["Seal", "A frozen copy nothing can change."], ["Trash", "Deleted scenes wait in the book's Trash."], ["Backup", "One zip of the whole library."]];
+  const keys = [["⌘S", "Save now"], ["⌘B · ⌘I", "Bold · italic"], ["⌘Z", "Undo"], ["* * *", "Scene break (own line)"], ["[xx]", "Love scene to write"], ["Esc", "Close a window"]];
+  document.getElementById("out").innerHTML = `<div class="page paper"><div class="band"><div><div class="mark">The Writing Desk · Quick start · ${pc ? "Windows" : "Mac"}</div>
+      <h1>Your first <i>hour</i> at the Desk</h1><p>Seven steps from empty folder to a book on the road. Pin it by the screen.</p></div></div>
+    <div class="qb"><div><h2>Seven <i>steps</i></h2>${steps.map((t, i) => `<div class="step"><b>${i + 1}</b><p>${sw(t)}</p></div>`).join("")}
+        <h2 style="margin-top:14px">The <i>road</i></h2><div class="chips">${["Setup", "Outline", "Draft", "Revise", "Edit", "Format", "Publish", "Market"].map(s => `<span class="chip">${s}</span>`).join('<span class="arr">›</span>')}</div>
+        <p class="tip">Format, Publish and Market each carry a step-by-step guide: Vellum, KDP, Draft2Digital, the email list, launch.</p>
+        <h2>Handy <i>keys</i></h2><div class="box keys">${keys.map(([k, v]) => `<div class="row"><span><kbd>${sw(k)}</kbd></span><span>${v}</span></div>`).join("")}</div>
+      </div>
+      <div><h2>The <i>tools</i></h2><div class="box">${tools.map(([k, v]) => `<div class="row"><b>${k}</b><span>${v}</span></div>`).join("")}</div>
+        <h2>Safety <i>nets</i></h2><div class="box">${nets.map(([k, v]) => `<div class="row"><b>${k}</b><span>${sw(v)}</span></div>`).join("")}</div>
+        <p class="tip">Stuck? Click <b style="font-style:normal">?</b> in the top bar for the full guide.</p></div></div>
+    <div class="foot"><span>annemarienarrates.github.io/writing-desk</span><span>${month}</span></div></div>`;
+  await document.fonts.ready; document.body.dataset.ready = "1";
+})();
+</script></body></html>

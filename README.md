@@ -40,3 +40,9 @@ This repository holds only the app. Your books never come here. They live as pla
 
 ## Library layout
 See `NOTES FOR CLAUDE.md`, which the Desk writes into every library.
+
+## Help and the printed guides
+
+- **?** in the top bar opens the guide inside the Desk (it works before a library is chosen, too). The words live in `js/help.js`, written with Mac keys; Windows computers see Ctrl and File Explorer instead.
+- The PDFs in `guide/` are printed from `guide/src`: `guide.html` (the full guide) and `quick.html` (the one-page quick start). Add `?pc` for the Windows edition. They use the same `js/help.js`, so the page and the PDF never disagree.
+- To reprint after a change: serve the folder that holds both `writing-desk` and `lamp-room` (the fonts come from the Lamp Room), open each page in Chrome, and print to PDF at Letter size with margins **None** and **Background graphics** on. Screenshots in `guide/img` come from the `?test` library, so no real book appears.
