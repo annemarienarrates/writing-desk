@@ -120,3 +120,28 @@ body.on-desk main { max-width: none; padding: 0; }
 .lamp-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .lampbook { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 0; }
 .lampbox { margin: 10px 0; }
+
+/* the Forge: stage tabs above the page */
+.rail { display: flex; gap: 2px; padding: 8px 16px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: nowrap; }
+.rail button { background: none; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; padding: 6px 11px; cursor: pointer; color: var(--muted); font: 500 12.5px var(--sans); white-space: nowrap; }
+.rail button:hover { color: var(--ink); }
+.rail button.on { background: var(--bg); border-color: var(--line); color: var(--ink); margin-bottom: -1px; }
+.rail button.done { color: var(--good, #4c6a1f); }
+.rail button.cur { color: var(--accent); font-weight: 600; }
+.rail button.blocked { opacity: .55; }
+.rail-sep { width: 1px; background: var(--line); margin: 4px 8px 6px; }
+.forgeview { max-width: 760px; margin: 22px auto 60px; padding: 0 24px; width: 100%; color: var(--ink); }
+.fv-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.fv-head h2 { margin: 0; }
+.fprompt { margin: 14px 0; }
+.forgeview pre { white-space: pre-wrap; font: 13.5px/1.5 var(--mono); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 6px 0 10px; }
+.fchecks { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.fcheck { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); gap: 8px; }
+.fcheck.gate { border-color: var(--accent); }
+.fcheck span:first-of-type { flex: 1; }
+.fready { border-left: 3px solid var(--accent); }
+.fdone { border-left: 3px solid var(--good, #4c6a1f); }
+.badge.ok { color: var(--good, #4c6a1f); }
+/* dictation */
+#dict.rec { color: #fff; background: #b3261e; border-color: #b3261e; }
+#dictlive { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); max-width: 640px; background: rgba(0,0,0,.78); color: #fff; font: 15px var(--serif); padding: 8px 16px; border-radius: 10px; z-index: 50; }

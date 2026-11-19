@@ -121,6 +121,23 @@
       const t = this.byId(id); if (t) Object.assign(t, next, { id });
       return true;
     },
+    async readTitle(id) { const t = await readJson(await this.titlesDir(true), safeId(id) + ".json"); if (t) { t.id = id; const i = this.titles.findIndex(x => x.id === id); if (i >= 0) this.titles[i] = t; } return t; },
+    // a finished stage: it and the ones before it are done. Reopened: it and the ones after it aren't. Nothing else changes.
+    async setStage(id, key, done) {
+      const td = await this.titlesDir(true), cur = await readJson(td, safeId(id) + ".json"); if (!cur) return false;
+      const ki = AUTHOR_KEYS.indexOf(key); if (ki < 0) return false;
+      const stages = (cur.stages || []).map(s => {
+        const i = AUTHOR_KEYS.indexOf(s.type); if (i < 0) return s;
+        if (done && i <= ki && !s.done) return Object.assign({}, s, { done: true, doneDate: today() });
+        if (!done && i >= ki && s.done) return Object.assign({}, s, { done: false, doneDate: null });
+        return s;
+      });
+      if (JSON.stringify(stages) === JSON.stringify(cur.stages)) return false;
+      const next = Object.assign({}, cur, { stages });
+      await writeFile(td, safeId(id) + ".json", JSON.stringify(next, null, 1));
+      const t = this.byId(id); if (t) Object.assign(t, next, { id });
+      return true;
+    },
     async setCover(id, blob) {
       const cd = await this.root.getDirectoryHandle("Covers", { create: true });
       await writeFile(cd, safeId(id) + ".jpg", await toJpeg(blob));

@@ -139,7 +139,7 @@ This folder is The Writing Desk's library. Everything here is plain files.
     async createBook(info, chapters) {
       const bd = await this.root.getDirectoryHandle("Books", { create: true });
       const folder = await freeName(bd, safe(info.title), "", true);
-      const book = { id: uid(), title: info.title || "Untitled", series: info.series || "", seriesNo: info.seriesNo || "", penName: info.penName || "", writer: info.writer || "", created: new Date().toISOString(), updated: new Date().toISOString(), cover: null, chapters: [], folder };
+      const book = { id: uid(), title: info.title || "Untitled", series: info.series || "", seriesNo: info.seriesNo || "", penName: info.penName || "", writer: info.writer || "", genre: info.genre || "", created: new Date().toISOString(), updated: new Date().toISOString(), cover: null, chapters: [], folder };
       await bd.getDirectoryHandle(folder, { create: true });
       const chs = chapters && chapters.length ? chapters : [{ title: "Chapter 1", scenes: [{ title: "Scene 1", text: "" }] }];
       for (const c of chs) {
