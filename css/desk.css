@@ -259,3 +259,15 @@ body.on-shelf .shelf-row:has(.lampspine) { --row: 385px; }
 .sbooks td { vertical-align: middle; }
 .sbar { display: block; width: 110px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 3px; }
 .sbar i { display: block; height: 100%; background: var(--accent); }
+/* book build */
+.looks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.look { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; cursor: pointer; color: var(--ink); display: flex; flex-direction: column; gap: 4px; }
+.look.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.prevframe { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 10px; background: #fbf8f2; margin: 8px 0 6px; }
+.matterlist { display: flex; flex-direction: column; gap: 6px; }
+.mrow { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+.mrow.off { opacity: .6; }
+.mrow textarea { min-height: 70px; margin-top: 6px; width: 100%; }
+.penbox { border-bottom: 1px solid var(--line); padding: 8px 0; }
+.penbox summary { cursor: pointer; }
+.penbox textarea { min-height: 80px; }

@@ -585,7 +585,7 @@
   function renderRail() {
     const book = E.book, el = $("#rail"); if (!book || !el) return;
     const cur = Forge.current(book);
-    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
+    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><button data-ft="build" class="${forgeTab === "build" ? "on" : ""}">📖 Build</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
       const done = Forge.isDone(book, s.key), blocked = !done && Forge.blockedBy(book, s.key);
       return `<button data-ft="${s.key}" class="${forgeTab === s.key ? "on" : ""} ${done ? "done" : s.key === cur ? "cur" : ""} ${blocked ? "blocked" : ""}" title="${done ? "Done" : s.key === cur ? "You are here" : blocked ? "Not ready: " + esc(blocked.item[1]) + " (" + blocked.stage.label + ")" : ""}">${done ? "✓ " : s.key === cur ? "● " : ""}${s.label}</button>`;
     }).join("");
@@ -596,8 +596,8 @@
     $("#ms-page").classList.toggle("hidden", on); $("#counts").classList.toggle("hidden", on);
     $$(".deskbar .btn").forEach(b => b.classList.toggle("hidden", on && b.id !== "tgp"));
     fv.classList.toggle("hidden", !on);
-    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
-    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (on) renderForge();
+    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : forgeTab === "build" ? "Book Build" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
+    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (forgeTab === "build") guard(renderBuild)(); else if (on) renderForge();
   }
   async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Copied. Paste it into the series' Claude Project chat."); } catch (e) { toast("Couldn't copy: select the text and copy it by hand."); } }
   function renderForge() {
@@ -841,6 +841,52 @@
     location.hash = "#/book/" + encodeURIComponent(b.folder);
   }
 
+  // ---------- Book Build: matter, look, files ----------
+  let buildLook = localStorage.getItem("wd-look") || "steel", buildPrev = "c1";
+  async function renderBuild() {
+    const book = E.book, fv = $("#forgeview"), M = Build.matter(book);
+    await saveNow();
+    const ps = await Build.pieces(book, { dropLove: true }), warn = await Build.warnings(book);
+    if (!ps.some(p => p.id === buildPrev)) buildPrev = (ps.find(p => p.kind === "chapter") || ps[0] || {}).id;
+    const P = Build.profile(book), c = M.copyrightInfo;
+    fv.innerHTML = `<div class="fv-head"><h2>Book Build</h2><span class="muted small">Front matter, back matter, and the files for KDP and Draft2Digital</span></div>
+      ${warn.length ? `<div class="card hint small"><b>Before you build:</b>${warn.slice(0, 8).map(w => `<div>• ${esc(w)}</div>`).join("")}${warn.length > 8 ? `<div>…and ${warn.length - 8} more</div>` : ""}</div>` : ""}
+      ${!book.penName ? "" : !Object.keys(P).length ? `<p class="small muted">Tip: fill in <b>${esc(book.penName)}</b>'s profile in <a href="#/settings">Settings › Pen names</a> (bio, website, newsletter, free book) and the About, Links and Free book pages write themselves.</p>` : ""}
+      <h3>The look</h3>
+      <div class="looks">${[["steel", "Steel", "Clean: bold sans-serif chapter titles, a plain rule between scenes. Reads well for men's fiction: LitRPG, space opera."], ["filigree", "Filigree", "Decorative: italic titles, a flourish, drop caps and a ❦ between scenes. Romance and fantasy."]].map(([k, l, d]) => `<button class="look ${buildLook === k ? "on" : ""}" data-look="${k}"><b>${l}</b><span class="small">${d}</span></button>`).join("")}</div>
+      <div class="row"><label class="small">Preview<select id="prevsel">${ps.map(p => `<option value="${p.id}" ${p.id === buildPrev ? "selected" : ""}>${esc(p.label || p.title)}</option>`).join("")}</select></label></div>
+      <iframe id="prevframe" class="prevframe" title="Preview"></iframe>
+      <h3>Make the files</h3>
+      <div class="row"><button class="btn primary" data-make="epub">EPUB (${buildLook === "steel" ? "Steel" : "Filigree"})</button><button class="btn" data-make="docx">Word .docx for Draft2Digital</button></div>
+      <p class="small muted">Both are saved in this book's <i>Exports</i> folder and downloaded. <b>KDP:</b> upload the EPUB. <b>Draft2Digital:</b> upload the EPUB to keep this look, or the .docx to use one of D2D's own looks (D2D makes its own title page, contents, Also By and About pages from your account, so switch those off on one side or the other). Check every page in each store's previewer before you publish.</p>
+      <h3>Front and back matter</h3>
+      <div class="matterlist">${Build.MATTER.map(m => { const cur = M[m.key], auto = m.auto ? Build.matterText(book, m.key) : null;
+        return `<div class="mrow ${cur.on ? "" : "off"}"><label class="check"><input type="checkbox" data-mon="${m.key}" ${cur.on ? "checked" : ""}> <b>${esc(m.label)}</b> <span class="muted small">${m.side === "front" ? "front" : "back"}</span></label>
+          ${m.key === "copyright" ? `<div class="fields small">${[["year", "Year"], ["holder", "Copyright holder"], ["cover", "Cover by"], ["edition", "Edition"], ["isbn", "ISBN (leave empty for KDP)"]].map(([k, l]) => `<label>${l}<input data-cr="${k}" value="${esc(c[k] || "")}" placeholder="${k === "holder" ? esc(book.penName || "") : ""}"></label>`).join("")}</div>` : ""}
+          ${m.text ? `<textarea data-mtext="${m.key}" placeholder="${esc(m.hint || "")}">${esc(cur.text || "")}</textarea>` : ""}
+          ${m.auto && m.key !== "title" && m.key !== "copyright" ? `<div class="small ${auto.length ? "" : "muted"}">${auto.length ? auto.map(x => esc(x.replace(/\*/g, ""))).join(" · ") : esc(m.hint || "")}</div>` : ""}</div>`; }).join("")}</div>
+      <h3>Chapters in the book</h3><div class="found">${book.chapters.map(ch => `<label class="check"><input type="checkbox" data-chon="${ch.id}" ${ch.skip ? "" : "checked"}> ${esc(ch.title)}</label>`).join("")}</div>`;
+    const showPrev = async () => { const all = await Build.pieces(book, { dropLove: true }); const p = all.find(x => x.id === buildPrev) || all[0]; if (p) $("#prevframe").srcdoc = Build.previewHtml(p, book, buildLook); };
+    showPrev();
+    $("#prevsel").onchange = e => { buildPrev = e.target.value; showPrev(); };
+    $$("[data-look]", fv).forEach(b => b.onclick = () => { buildLook = b.dataset.look; localStorage.setItem("wd-look", buildLook); renderBuild(); });
+    let tt = 0; const later = fn => { clearTimeout(tt); tt = setTimeout(guard(async () => { await fn(); await Store.saveBook(book); showPrev(); }), 600); };
+    $$("[data-mon]", fv).forEach(x => x.onchange = guard(async () => { M[x.dataset.mon].on = x.checked; await Store.saveBook(book); renderBuild(); }));
+    $$("[data-mtext]", fv).forEach(x => x.oninput = () => { const k = x.dataset.mtext; if (x.value.trim() && !M[k].on) { M[k].on = true; const cb = $(`[data-mon="${k}"]`, fv); cb.checked = true; cb.closest(".mrow").classList.remove("off"); } later(() => { M[k].text = x.value; }); });
+    $$("[data-cr]", fv).forEach(x => x.oninput = () => later(() => { M.copyrightInfo[x.dataset.cr] = x.value.trim(); }));
+    $$("[data-chon]", fv).forEach(x => x.onchange = guard(async () => { const ch = book.chapters.find(c => c.id === x.dataset.chon); ch.skip = !x.checked || undefined; await Store.saveBook(book); showPrev(); }));
+    $$("[data-make]", fv).forEach(b => b.onclick = guard(async () => {
+      b.disabled = true; toast("Building…");
+      try {
+        const kind = b.dataset.make, blob = kind === "epub" ? await Build.epub(book, buildLook) : await Build.docx(book);
+        const name = `${Store.safe(book.title)}${kind === "epub" ? " - " + (buildLook === "steel" ? "Steel" : "Filigree") + ".epub" : " - Draft2Digital.docx"}`;
+        await Store.saveExport(book, name, blob);
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        toast(`${name}: saved in Exports and downloaded.`, 5000);
+      } finally { b.disabled = false; }
+    }));
+  }
+
   // ---------- people and places ----------
   async function renderCast() {
     const book = E.book, fv = $("#forgeview"); book.cast = book.cast || [];
@@ -976,6 +1022,7 @@
         <p class="small muted">The themes come straight from the Lamp Room, so a theme added there shows up here too.</p></div>
       <div class="card"><h3>Writers and pen names</h3><div id="wr"></div><button class="btn small" id="addw">+ Writer</button>
         <p class="small muted">Each book is filed under a writer and a pen name. The bookshelf can filter by either.</p></div>
+      <div class="card"><h3>Pen names</h3><p class="small muted">What the Book Build puts on the About the Author, Links, Free book and Also By pages for each pen name.</p><div id="pens"></div></div>
       <div class="card"><h3>Genre packs</h3><p class="small muted">The master copies, in your library's <i>Genre Packs</i> folder. A book's genre (Book tab) decides which pack the style checker uses. Each pack also holds its own extra tells, budgets and ignored lines.</p>
         <div id="packs" class="packs"></div><button class="btn small quiet" id="addpack">+ Genre</button></div>
       <div class="card"><h3>Lamp Room</h3>${Lamp.state === "ready" ? `<p>Connected to <b>${esc(Lamp.name())}</b>: ${Lamp.titles.length} writing project${Lamp.titles.length === 1 ? "" : "s"}.</p>` : Lamp.state === "needs-permission" ? `<p>The Lamp Room library this browser uses, <b>${esc(Lamp.name())}</b>, needs your OK.</p>` : `<p>Not connected yet.</p>`}
@@ -1016,6 +1063,16 @@
       if (window.showSaveFilePicker) { try { const h = await showSaveFilePicker({ suggestedName: name, types: [{ description: "Zip", accept: { "application/zip": [".zip"] } }] }); const w = await h.createWritable(); await w.write(blob); await w.close(); toast("Backup saved."); } catch (e) { if (e.name !== "AbortError") throw e; } }
       else { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); }
     });
+    const drawPens = () => {
+      const pens = Store.pens(); S.penProfiles = S.penProfiles || {};
+      $("#pens").innerHTML = pens.length ? pens.map(({ pen }) => { const p = S.penProfiles[pen] || {}; return `<details class="penbox"><summary><b>${esc(pen)}</b> <span class="muted small">${p.bio ? "bio ✓ " : ""}${p.website ? "website ✓ " : ""}${p.offer ? "free book ✓" : ""}</span></summary>
+        <div class="fields"><label class="grow">Website<input data-pp="${esc(pen)}" data-k="website" value="${esc(p.website || "")}"></label><label class="grow">Newsletter sign-up link<input data-pp="${esc(pen)}" data-k="newsletter" value="${esc(p.newsletter || "")}"></label></div>
+        <div class="fields"><label class="grow">Free book: title<input data-pp="${esc(pen)}" data-k="offerTitle" value="${esc(p.offerTitle || "")}"></label><label class="grow">Free book: the offer<input data-pp="${esc(pen)}" data-k="offer" value="${esc(p.offer || "")}" placeholder="Get the prequel novella free when you join the newsletter."></label></div>
+        <label class="wide">About the author<textarea data-pp="${esc(pen)}" data-k="bio">${esc(p.bio || "")}</textarea></label>
+        <label class="wide">Other links, one per line: <i>Label | URL</i><textarea data-pp="${esc(pen)}" data-k="links" placeholder="Facebook group | https://…">${esc(p.links || "")}</textarea></label></details>`; }).join("") : `<p class="small muted">Add pen names under Writers first.</p>`;
+      $$("[data-pp]").forEach(x => x.oninput = () => { const p = S.penProfiles[x.dataset.pp] = S.penProfiles[x.dataset.pp] || {}; p[x.dataset.k] = x.value; save(); });
+    };
+    drawPens();
     const drawPacks = guard(async () => { const ps = await Store.listPacks(); $("#packs").innerHTML = ps.map(g => `<button class="reffile" data-pack="${esc(g)}"><b>${esc(g)}</b><span class="muted small">${Store.books.filter(b => b.genre === g).length} book(s)</span></button>`).join(""); $$("[data-pack]").forEach(b => b.onclick = guard(() => editPack(b.dataset.pack).then(drawPacks))); });
     drawPacks();
     $("#addpack").onclick = guard(async () => { const g = await promptBox("New genre", "", "Add"); if (!g) return; await Store.savePack(g, `# ${g} genre pack\n`, { tells: [], budgets: {}, ignore: [] }); drawPacks(); });

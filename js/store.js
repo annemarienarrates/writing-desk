@@ -466,6 +466,8 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       if (checks) await writeFile(d, safe(g) + ".checks.json", JSON.stringify(checks, null, 2));
     },
 
+    async saveExport(book, name, blob) { const d = await dirAt(await this.bookDir(book, true), ["Exports"], true); await writeFile(d, name, blob); },
+
     // ---------- backup: the whole library as one zip ----------
     async backupZip(onProgress) {
       const zip = new JSZip(); let n = 0;

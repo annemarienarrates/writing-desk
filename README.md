@@ -26,6 +26,7 @@ This repository holds only the app. Your books never come here. They live as pla
 - **Timeline:** a day and time for every scene, filled in from time words in the text ("the next morning", "three days later", weekdays). It flags days that go backwards, jumps that don't match the text, and weekdays that don't match the dates.
 - **Continuity:** eye colour, hair colour and ages that disagree between chapters and the bible (in People & places).
 - **Series page** (click a series label on the shelf): every book in the series with its stage, words and dates; series totals and book speed; who appears in which book; continuity across the books (eyes and hair must match, ages may only go up); story time across the books. **Start Book N** carries the pen name, genre, cast list and reference shelf into the next book.
+- **📖 Book Build:** front and back matter (title page, copyright, content note, free bonus, review ask, next-book teaser, newsletter, links, afterword, Also By, About the Author, acknowledgments), with the pen-name pages filled in from each pen name's profile in Settings. It makes an EPUB 3 in two looks, **Steel** (clean) and **Filigree** (decorative, with drop caps and ornaments), and a plain Word .docx for Draft2Digital's formatter. Files are saved in the book's `Exports` folder. The EPUBs pass epubcheck.
 - **Backup:** saves the whole library as one .zip.
 
 ## Built like the Lamp Room
