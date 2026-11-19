@@ -155,6 +155,28 @@
       await writeFile(dir, safeId(id) + ".json", JSON.stringify(doc, null, 1));
       return id;
     },
+    // the narrators the Lamp Room knows (Settings there), for choosing who reads which voice
+    narrators() { return ((this.settings && this.settings.narrators) || []).map(n => n.name).filter(Boolean); },
+    // a NEW audio project in the Lamp Room: chapters with parts already marked, readers set, character scripts loaded.
+    // An audio project that exists is never written to: updates go through the Lamp Room's own "Update manuscript".
+    async createAudio(book, chapters, parts, cues, docxBlob, docxName) {
+      const bd = await this.root.getDirectoryHandle("Books", { create: true });
+      const base = String(book.title || "Untitled").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "").trim().slice(0, 80) || "Untitled";
+      let folder = base, n = 2; while (true) { try { await bd.getDirectoryHandle(folder); folder = base + " (" + n++ + ")"; } catch (e) { break; } }
+      const dir = await bd.getDirectoryHandle(folder, { create: true });
+      for (const sub of ["manuscript", "audio", "exports"]) await dir.getDirectoryHandle(sub, { create: true });
+      if (docxBlob) await writeFile(await dir.getDirectoryHandle("manuscript"), docxName || "manuscript.docx", docxBlob);
+      const now = new Date().toISOString(), uidL = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+      const readers = [...new Set(Object.values(parts).filter(Boolean))];
+      const lb = { version: 1, id: uidL(), title: book.title, author: book.penName || book.writer || "", client: "", color: INKS[(this.titles.length + 3) % INKS.length], due: "",
+        rate: { type: "pfh", amount: "" }, myShare: 100, cast: readers.map(r => ({ name: r, share: Math.round(100 / Math.max(1, readers.length)) })), status: "active", notes: "Sent from the Writing Desk with parts marked.",
+        source: { file: docxName || null, method: "writing-desk", options: {} }, parts, cues: { scripts: cues },
+        chapters: chapters.map(c => ({ id: uidL(), title: c.title, paras: c.paras, words: c.words, included: true, status: "todo", boothSeconds: 0, notes: "" })), created: now, updated: now };
+      if (book.series) lb.series = book.series;
+      await writeFile(dir, "book.json", JSON.stringify(lb, null, 1));
+      return { id: lb.id, folder };
+    },
+    async audioExists(folder) { try { await (await (await this.root.getDirectoryHandle("Books")).getDirectoryHandle(folder)).getFileHandle("book.json"); return true; } catch (e) { return false; } },
     async setCover(id, blob) {
       const cd = await this.root.getDirectoryHandle("Covers", { create: true });
       await writeFile(cd, safeId(id) + ".jpg", await toJpeg(blob));

@@ -585,7 +585,7 @@
   function renderRail() {
     const book = E.book, el = $("#rail"); if (!book || !el) return;
     const cur = Forge.current(book);
-    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><button data-ft="build" class="${forgeTab === "build" ? "on" : ""}">📖 Build</button><button data-ft="kit" class="${forgeTab === "kit" ? "on" : ""}">🏷 Kit</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
+    el.innerHTML = `<button data-ft="" class="${forgeTab ? "" : "on"}">✎ Manuscript</button><button data-ft="check" class="${forgeTab === "check" ? "on" : ""}">✓ Check</button><button data-ft="cast" class="${forgeTab === "cast" ? "on" : ""}">👥 Cast</button><button data-ft="time" class="${forgeTab === "time" ? "on" : ""}">🕰 Timeline</button><button data-ft="build" class="${forgeTab === "build" ? "on" : ""}">📖 Build</button><button data-ft="kit" class="${forgeTab === "kit" ? "on" : ""}">🏷 Kit</button><button data-ft="voices" class="${forgeTab === "voices" ? "on" : ""}">🎙 Voices</button><span class="rail-sep"></span>` + Forge.STAGES.map(s => {
       const done = Forge.isDone(book, s.key), blocked = !done && Forge.blockedBy(book, s.key);
       return `<button data-ft="${s.key}" class="${forgeTab === s.key ? "on" : ""} ${done ? "done" : s.key === cur ? "cur" : ""} ${blocked ? "blocked" : ""}" title="${done ? "Done" : s.key === cur ? "You are here" : blocked ? "Not ready: " + esc(blocked.item[1]) + " (" + blocked.stage.label + ")" : ""}">${done ? "✓ " : s.key === cur ? "● " : ""}${s.label}</button>`;
     }).join("");
@@ -596,8 +596,8 @@
     $("#ms-page").classList.toggle("hidden", on); $("#counts").classList.toggle("hidden", on);
     $$(".deskbar .btn").forEach(b => b.classList.toggle("hidden", on && b.id !== "tgp"));
     fv.classList.toggle("hidden", !on);
-    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : forgeTab === "build" ? "Book Build" : forgeTab === "kit" ? "Publishing kit" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
-    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (forgeTab === "build") guard(renderBuild)(); else if (forgeTab === "kit") guard(renderKit)(); else if (on) renderForge();
+    $("#where").textContent = forgeTab === "check" ? "Style check" : forgeTab === "cast" ? "People & places" : forgeTab === "time" ? "Timeline" : forgeTab === "build" ? "Book Build" : forgeTab === "kit" ? "Publishing kit" : forgeTab === "voices" ? "Voices" : on ? "Series Forge" : E.ch && E.sc ? E.ch.title + " › " + E.sc.title : "";
+    if (forgeTab === "check") guard(renderCheck)(); else if (forgeTab === "cast") guard(renderCast)(); else if (forgeTab === "time") guard(renderTimeline)(); else if (forgeTab === "build") guard(renderBuild)(); else if (forgeTab === "kit") guard(renderKit)(); else if (forgeTab === "voices") guard(renderVoices)(); else if (on) renderForge();
   }
   async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Copied. Paste it into the series' Claude Project chat."); } catch (e) { toast("Couldn't copy: select the text and copy it by hand."); } }
   function renderForge() {
@@ -946,6 +946,92 @@
         const l = document.createElement("a"); l.href = URL.createObjectURL(blob); l.download = name; document.body.appendChild(l); l.click(); l.remove();
         toast(`${name}: saved in Exports and downloaded.`); renderKit();
       } finally { b.disabled = false; }
+    }));
+  }
+
+  // ---------- voices: who speaks each line, then off to the Lamp Room ----------
+  let voiceFilter = "look";
+  async function renderVoices() {
+    const book = E.book, fv = $("#forgeview"), V = book.voices = book.voices || {}; V.lines = V.lines || {}; V.tones = V.tones || {}; V.readers = V.readers || {}; V.mode = V.mode || "duet";
+    fv.innerHTML = `<div class="fv-head"><h2>Voices</h2></div><p class="small muted">Reading the book…</p>`;
+    await saveNow();
+    const people = (book.cast || []).filter(c => c.kind === "person");
+    const scenes = (await scenesOf(book)).filter(s => !(book.chapters.find(c => c.id === s.chId) || {}).skip);
+    const lines = Voices.analyse(book.cast || [], scenes, V.pov);
+    if (V.mode === "full") Voices.ensureColors(book);
+    const voices = Voices.voicesUsed(book, lines);
+    const spk = l => Voices.speakerOf(book, l), chosen = l => !!V.lines[l.key];
+    const needs = l => !chosen(l) && (!l.sure || !l.guess), unset = people.filter(c => !c.voice);
+    const counts = {}; for (const l of lines) { const s = spk(l); counts[s] = (counts[s] || 0) + 1; }
+    const shown = lines.filter(l => voiceFilter === "all" || needs(l));
+    const readers = [...new Set([...(Lamp.state === "ready" ? Lamp.narrators() : []), ...(Store.settings.writers || []).map(w => w.name).filter(n => n !== "Me"), "Cast 1", "Cast 2", "Cast 3", "Cast 4"])];
+    const rsel = (part, label) => `<label class="small">${esc(label)}<select data-reader="${esc(part)}"><option value="">—</option>${readers.map(r => `<option ${V.readers[part] === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></label>`;
+    const opts = cur => `<option value="">(narration)</option>${people.map(c => `<option ${cur === c.name ? "selected" : ""}>${esc(c.name)}</option>`).join("")}<option ${cur === "System" ? "selected" : ""}>System</option>`;
+    let lastCh = "";
+    const sentOk = book.lampAudio && Lamp.state === "ready" && await Lamp.audioExists(book.lampAudio.folder);
+    fv.innerHTML = `<div class="fv-head"><h2>Voices</h2><span class="muted small">Who speaks each line, for narration in the Lamp Room</span></div>
+      ${!people.length ? `<div class="card hint">Start in <b>👥 Cast</b>: keep the people on the list, then come back here.</div>` : ""}
+      <div class="card"><h3>1. The voices</h3>
+        <div class="row"><label class="check"><input type="radio" name="vmode" value="duet" ${V.mode === "duet" ? "checked" : ""}> <b>Duet</b>: men's lines blue, women's pink, the System yellow</label>
+          <label class="check"><input type="radio" name="vmode" value="full" ${V.mode === "full" ? "checked" : ""}> <b>Full cast</b>: a colour for every character</label></div>
+        <div class="row"><label class="small">Whose is “I said” (first person)<select id="vpov"><option value="">—</option>${people.map(c => `<option ${V.pov === c.name ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label></div>
+        ${people.length ? `<table class="ctable"><tr><th>Character</th><th>Voice</th><th>Lines</th>${V.mode === "full" ? "<th>Colour</th>" : ""}</tr>${people.map(c => `<tr><td><b>${esc(c.name)}</b></td><td><select data-cv="${esc(c.name)}"><option value="">choose…</option><option value="m" ${c.voice === "m" ? "selected" : ""}>Male</option><option value="f" ${c.voice === "f" ? "selected" : ""}>Female</option><option value="n" ${c.voice === "n" ? "selected" : ""}>Read as narration</option></select></td><td>${counts[c.name] || 0}</td>${V.mode === "full" ? `<td><span class="swatch" style="background:#${esc((V.colors || {})[c.name] || "eee")}"></span></td>` : ""}</tr>`).join("")}</table>` : ""}
+        ${unset.length ? `<p class="small bad">Choose a voice for ${unset.map(c => esc(c.name)).join(", ")}: it also tells the guesser who “he” and “she” are.</p>` : ""}
+        <h4>Who reads them</h4><div class="row">${rsel("n", "Narration")}${voices.map(v => rsel(v.part, v.label)).join("")}</div></div>
+      <div class="card"><h3>2. The lines</h3>
+        <p class="small">${num(lines.length)} lines of dialogue: ${num(lines.filter(l => chosen(l)).length)} set by you, ${num(lines.filter(l => !chosen(l) && l.sure && l.guess).length)} sure from a tag, ${num(lines.filter(l => !chosen(l) && l.guess && !l.sure).length)} guessed, <b>${num(lines.filter(l => !chosen(l) && !l.guess).length)} with no speaker</b>.</p>
+        <div class="row chips"><button class="btn small ${voiceFilter === "look" ? "primary" : "quiet"}" data-vf="look">Needs a look (${num(lines.filter(needs).length)})</button><button class="btn small ${voiceFilter === "all" ? "primary" : "quiet"}" data-vf="all">Every line</button></div>
+        <div class="vlines">${shown.slice(0, 400).map(l => { const s = spk(l), part = Voices.partOf(book, s), col = part === "n" ? "" : part.startsWith("c:") ? "#" + part.slice(2) : "#" + Voices.DUET[part];
+          const head = l.ch !== lastCh ? `<div class="vch">${esc(l.ch)}</div>` : ""; lastCh = l.ch;
+          return head + `<div class="vline ${chosen(l) ? "mine" : l.sure ? "sure" : l.guess ? "guess" : "none"}"><select data-vl="${esc(l.key)}">${opts(s)}</select>
+            <span class="vtext" ${col ? `style="background:${col}"` : ""}>${esc(l.text.length > 220 ? l.text.slice(0, 220) + "…" : l.text)}</span>
+            <input class="vtone" data-vt="${esc(l.key)}" value="${esc(Voices.toneOf(book, l))}" placeholder="tone"><button class="btn small quiet" data-vgo="${esc(l.sceneId)}" data-vfind="${esc(l.text.slice(0, 40))}" title="Show in the page">↗</button>
+            <span class="vhow small muted">${chosen(l) ? "set by you" : esc(l.how)}</span></div>`; }).join("") || `<p class="small">Nothing needs a look. ✓</p>`}
+          ${shown.length > 400 ? `<p class="small muted">Showing the first 400. Fix these and the rest move up.</p>` : ""}</div></div>
+      <div class="card"><h3>3. To the Lamp Room</h3>
+        <div class="row"><button class="btn" id="vdocx">Highlighted manuscript (.docx)</button><button class="btn" id="vscripts">Character scripts (.docx)</button>
+          ${Lamp.state !== "ready" ? `<span class="small muted">Connect the Lamp Room in Settings to send it straight there.</span>` : sentOk ? `<span class="badge ok">Sent to the Lamp Room ✓</span>` : `<button class="btn primary" id="vsend">Send to the Lamp Room</button>`}</div>
+        <p class="small muted">${sentOk ? "The Lamp Room's copy is never overwritten from here, so recordings stay safe. For a changed manuscript, make the highlighted .docx and use <b>Update manuscript</b> on the book in the Lamp Room (chapters are matched by title, recordings stay); character scripts can be replaced there too." : "Sending makes a new audio project in the Lamp Room with every line already marked, the readers set and the character scripts loaded. The files go to this book's Exports folder too, for other narrators or for the Lamp Room's own import."}</p></div>`;
+    const save = guard(async () => { await Store.saveBook(book); });
+    let t = 0; const later = () => { clearTimeout(t); t = setTimeout(save, 600); };
+    $$("[name=vmode]", fv).forEach(r => r.onchange = guard(async () => { V.mode = r.value; await save(); renderVoices(); }));
+    $("#vpov").onchange = guard(async e => { V.pov = e.target.value; await save(); renderVoices(); });
+    $$("[data-cv]", fv).forEach(sel => sel.onchange = guard(async () => { book.cast.find(c => c.name === sel.dataset.cv).voice = sel.value; await save(); renderVoices(); }));
+    $$("[data-reader]", fv).forEach(sel => sel.onchange = guard(async () => { V.readers[sel.dataset.reader] = sel.value; await save(); }));
+    $$("[data-vf]", fv).forEach(b => b.onclick = () => { voiceFilter = b.dataset.vf; renderVoices(); });
+    $$("[data-vl]", fv).forEach(sel => sel.onchange = () => {
+      V.lines[sel.dataset.vl] = sel.value || "-";   // "-": you chose narration
+      const row = sel.closest(".vline"); row.className = "vline mine"; row.querySelector(".vhow").textContent = "set by you";
+      const part = Voices.partOf(book, sel.value), tx = row.querySelector(".vtext"); tx.style.background = part === "n" ? "" : part.startsWith("c:") ? "#" + part.slice(2) : "#" + Voices.DUET[part];
+      later();
+    });
+    $$("[data-vt]", fv).forEach(inp => inp.oninput = () => { V.tones[inp.dataset.vt] = inp.value; later(); });
+    $$("[data-vgo]", fv).forEach(b => b.onclick = guard(() => goFind(b.dataset.vgo, b.dataset.vfind)));
+    const outputs = async () => {
+      const L = Voices.analyse(book.cast || [], (await scenesOf(book)).filter(s => !(book.chapters.find(c => c.id === s.chId) || {}).skip), V.pov);
+      const vs = Voices.voicesUsed(book, L), chs = await Voices.lampChapters(book, L);
+      return { L, vs, chs };
+    };
+    const dl = (blob, name) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+    $("#vdocx").onclick = guard(async () => { const { vs, chs } = await outputs(); const blob = await Voices.highlightedDocx(book, chs, vs), name = `${Store.safe(book.title)} - Highlighted manuscript.docx`; await Store.saveExport(book, name, blob); dl(blob, name); toast(`${name}: saved in Exports and downloaded.`); });
+    $("#vscripts").onclick = guard(async () => {
+      const { L, vs } = await outputs(), scs = Voices.scripts(book, L, vs);
+      if (!scs.length) { toast("No voiced lines yet."); return; }
+      for (const sc of scs) { const blob = await Voices.scriptDocx(book, sc, V.readers[sc.voice.part]), name = `${Store.safe(book.title)} - Script - ${Store.safe(sc.title)}.docx`; await Store.saveExport(book, name, blob); dl(blob, name); }
+      toast(`${scs.length} character script${scs.length === 1 ? "" : "s"}: saved in Exports and downloaded.`);
+    });
+    $("#vsend") && ($("#vsend").onclick = guard(async () => {
+      if (unset.length && !(await confirmBox(`${unset.map(c => esc(c.name)).join(", ")} ${unset.length === 1 ? "has" : "have"} no voice yet, so their lines would be read as narration. Send anyway?`, "Send anyway"))) return;
+      const nl = lines.filter(l => !chosen(l) && !l.guess).length;
+      if (nl && !(await confirmBox(`${nl} line${nl === 1 ? " has" : "s have"} no speaker and will be read as narration. Send anyway?`, "Send anyway"))) return;
+      const { L, vs, chs } = await outputs(), scs = Voices.scripts(book, L, vs);
+      const parts = { n: V.readers.n || "" }; for (const v of vs) parts[v.part] = V.readers[v.part] || "";
+      const blob = await Voices.highlightedDocx(book, chs, vs), name = `${Store.safe(book.title)} - Highlighted manuscript.docx`;
+      await Store.saveExport(book, name, blob);
+      const r = await Lamp.createAudio(book, chs, parts, Voices.lampCues(book, scs), blob, name);
+      book.lampAudio = { id: r.id, folder: r.folder, sent: Store.today() }; await save();
+      toast(`“${book.title}” is in the Lamp Room as an audio project: ${chs.length} chapters, ${vs.length} voice${vs.length === 1 ? "" : "s"}, ${scs.length} character script${scs.length === 1 ? "" : "s"}.`, 7000);
+      renderVoices();
     }));
   }
 

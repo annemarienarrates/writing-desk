@@ -281,3 +281,16 @@ body.on-shelf .shelf-row:has(.lampspine) { --row: 385px; }
 .kli input { flex: 1; }
 .cnt { font: 11px var(--mono); color: var(--muted); }
 .cnt.over { color: var(--bad, #b3261e); font-weight: 700; }
+/* voices */
+.swatch { display: inline-block; width: 22px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: middle; }
+.vlines { display: flex; flex-direction: column; gap: 4px; }
+.vch { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 4px; }
+.vline { display: grid; grid-template-columns: 150px 1fr 120px 34px; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); border-left-width: 3px; background: var(--panel); }
+.vline.mine { border-left-color: var(--good, #4c6a1f); }
+.vline.sure { border-left-color: color-mix(in srgb, var(--good, #4c6a1f) 50%, transparent); }
+.vline.guess { border-left-color: var(--accent); }
+.vline.none { border-left-color: var(--bad, #b3261e); }
+.vtext { font-family: var(--serif); font-size: 14px; padding: 1px 5px; border-radius: 3px; color: #222; }
+.vline .vtext:not([style]) { color: var(--ink); }
+.vhow { grid-column: 2 / 5; }
+.vtone { font-size: 12px; }
