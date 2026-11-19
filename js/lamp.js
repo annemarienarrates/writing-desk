@@ -1,19 +1,17 @@
-/* The Writing Desk — the link to the Lamp Room.
+/* The Writing Desk — the link to the Lamp Room's writing projects.
+   A writing project is a planner title in the Lamp Room library ("Author work"): Ledger/titles/<id>.json with kind "author",
+   and its cover in Covers/<id>.jpg. A Desk book links to one by its id (book.lampTitle).
    Both apps live on the same site, so the Desk can reuse the Lamp Room library folder this browser already opened
-   (Chrome still asks once for permission). The Desk only ever ADDS new book folders to the Lamp Room library;
-   it never edits a Lamp Room book that already exists, so nothing there (parts, takes, progress) can be disturbed. */
+   (Chrome still asks once). The Desk never touches audio projects, and only ever writes a writing project's details
+   (title, series, pen name) and cover, never its stages, hours or dates. */
 (function () {
   "use strict";
-  const SCENE_MARK = "⁂";
+  const AUTHOR_KEYS = ["outline", "draft", "revise", "aedit", "format", "publish", "market"];
   const INKS = ["#7a2e1d", "#2f5d50", "#23466e", "#6b3f7a", "#8a6a12", "#4c6a1f", "#8c3b55", "#3d5a80", "#9c4f12", "#5a5048"];
-  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const safeFolder = s => String(s || "Untitled").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "").replace(/\s+/g, " ").trim().slice(0, 80) || "Untitled";
-  const countWords = s => { const m = String(s || "").match(/\S+/g); return m ? m.length : 0; };
-  const paraText = p => typeof p === "string" ? p : (p && p.r ? p.r.map(x => x[0]).join("") : "");
-  // Desk Markdown → the Lamp Room's plain paragraphs
-  const plain = md => md.replace(/\\\*/g, "\u0002").replace(/\*\*\*|\*\*|\*/g, "").replace(/\u0002/g, "*").replace(/\\\\/g, "\\").replace(/\s*\n\s*/g, " ").trim();
-  // the Lamp Room's paragraphs → Desk Markdown (narration parts and highlights are left behind; the text comes over)
-  const toMd = t => String(t).replace(/\\/g, "\\\\").replace(/\*/g, "\\*");
+  const safeId = s => String(s).replace(/[^\w.-]+/g, "_");
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const today = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+  const seriesNo = v => v === "" || v == null || isNaN(+v) ? null : +v;
 
   async function kvGet(dbName, key) {
     if (indexedDB.databases) { const list = await indexedDB.databases(); if (!list.some(d => d.name === dbName)) return null; }
@@ -30,9 +28,16 @@
   }
   async function readJson(dir, name) { try { return JSON.parse(await (await (await dir.getFileHandle(name)).getFile()).text()); } catch (e) { return null; } }
   async function writeFile(dir, name, data) { const w = await (await dir.getFileHandle(name, { create: true })).createWritable(); await w.write(data); await w.close(); }
+  // the Lamp Room keeps covers as JPEGs no bigger than 800 px
+  async function toJpeg(blob) {
+    const img = await createImageBitmap(blob), k = Math.min(1, 800 / Math.max(img.width, img.height));
+    const cv = document.createElement("canvas"); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    return new Promise(res => cv.toBlob(res, "image/jpeg", 0.88));
+  }
 
   const Lamp = {
-    root: null, state: "none", books: [], settings: null,
+    root: null, state: "none", titles: [], settings: null,
 
     async init() {
       try {
@@ -52,78 +57,85 @@
         if ((await this.root.requestPermission({ mode: "readwrite" })) !== "granted") throw new Error("Chrome didn't get permission for the Lamp Room library.");
       } else {
         const h = await window.showDirectoryPicker({ id: "lamp-room-library", mode: "readwrite" });
-        const looks = (await readJson(h, "lamp-room.json")) || (await h.getDirectoryHandle("Books").then(() => ({}), () => null));
-        if (!looks) throw new Error("That folder doesn't look like the Lamp Room library (it has no lamp-room.json or Books folder).");
+        const looks = (await readJson(h, "lamp-room.json")) || (await h.getDirectoryHandle("Ledger").then(() => ({}), () => null));
+        if (!looks) throw new Error("That folder doesn't look like the Lamp Room library (it has no lamp-room.json or Ledger folder).");
         this.root = h;
       }
       await kvSet("lamp", this.root);
       this.state = "ready"; await this.load();
     },
+    async titlesDir(create) { return (await this.root.getDirectoryHandle("Ledger", { create })).getDirectoryHandle("titles", { create }); },
     async load() {
       this.settings = (await readJson(this.root, "lamp-room.json")) || {};
-      this.books = [];
-      let bd; try { bd = await this.root.getDirectoryHandle("Books"); } catch (e) { return; }
-      for await (const [name, h] of bd.entries()) {
-        if (h.kind !== "directory") continue;
-        const b = await readJson(h, "book.json");
-        if (b && b.id) { b.folder = name; this.books.push(b); }
+      this.titles = [];
+      let td; try { td = await this.titlesDir(false); } catch (e) { return; }
+      for await (const [n, h] of td.entries()) {
+        if (h.kind !== "file" || !n.endsWith(".json")) continue;
+        const t = await readJson(td, n);
+        if (t && t.kind === "author") { t.id = n.slice(0, -5); this.titles.push(t); }
       }
-      this.books.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      this.titles.sort((a, b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1) || (a.name || "").localeCompare(b.name || ""));
     },
-    byId(id) { return this.books.find(b => b.id === id); },
-    linkedDesk(lampId) { return Store.books.find(b => b.lamp && b.lamp.id === lampId); },
-    unlinked() { return this.books.filter(b => !this.linkedDesk(b.id)); },
-    url(lampId) { return "../lamp-room/" + (Store.testMode ? "?test" : "") + "#/book/" + encodeURIComponent(lampId); },
+    byId(id) { return this.titles.find(t => t.id === id); },
+    linkedDesk(id) { return Store.books.find(b => b.lampTitle === id); },
+    unlinked() { return this.titles.filter(t => t.status !== "done" && !this.linkedDesk(t.id)); },
+    url() { return "../lamp-room/" + (Store.testMode ? "?test" : ""); },
 
-    // a Lamp Room book's text as Desk chapters and scenes
-    toDeskChapters(lb) {
-      return (lb.chapters || []).map(c => {
-        const paras = (c.paras || []).map(paraText).map(s => s.trim()).filter(Boolean);
-        const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-        // the heading line(s), kept in the Lamp Room because they're read aloud: "Chapter 2" or "Chapter 2" + "Cinders"
-        if (paras.length > 1 && norm(paras[0] + " " + paras[1]) === norm(c.title)) paras.splice(0, 2);
-        else if (paras.length && (norm(paras[0]) === norm(c.title) || norm(c.title).startsWith(norm(paras[0])) && paras[0].length <= 60)) paras.shift();
-        const scenes = [[]];
-        for (const p of paras) { if (p === SCENE_MARK || /^\s*(?:[*#~•·⁂◆◇❖✦✧=_-]\s*){1,7}\s*$/.test(p)) { if (scenes[scenes.length - 1].length) scenes.push([]); } else scenes[scenes.length - 1].push(toMd(p)); }
-        const out = scenes.filter(s => s.length).map((s, i) => ({ title: `Scene ${i + 1}`, text: s.join("\n\n") + "\n" }));
-        return { title: c.title || "Chapter", scenes: out.length ? out : [{ title: "Scene 1", text: "" }], words: c.words || 0, front: c.included === false };
-      });
+    // the Lamp Room's people are keys ("anne", "jack"); the Desk's writers are names
+    keyOf(name) {
+      const n = String(name || "").trim().toLowerCase(), N = ((this.settings && this.settings.narrators) || []).map(x => String(x.name || "").toLowerCase());
+      if (n === "anne" || n === "jack") return n;
+      const i = N.indexOf(n); return i === 0 ? "anne" : i === 1 ? "jack" : null;
+    },
+    nameOf(key) {
+      const N = (this.settings && this.settings.narrators) || [];
+      const fromLamp = key === "anne" ? N[0] && N[0].name : key === "jack" ? N[1] && N[1].name : null;
+      const ws = (Store.settings.writers || []).map(w => w.name);
+      return ws.find(w => w.toLowerCase() === String(key || "").toLowerCase()) || ws.find(w => fromLamp && w.toLowerCase() === fromLamp.toLowerCase()) || fromLamp || "";
     },
 
-    // a new Lamp Room book from a Desk book; chapters = [{ title, scenes: [{ text }] }] (Markdown)
-    async createFromDesk(book, chapters, originalFile) {
-      if (this.state !== "ready") throw new Error("The Lamp Room library isn't connected.");
-      const bd = await this.root.getDirectoryHandle("Books", { create: true });
-      let base = safeFolder(book.title), folder = base, n = 2;
-      while (true) { try { await bd.getDirectoryHandle(folder); folder = base + " (" + n++ + ")"; } catch (e) { break; } }
-      const dir = await bd.getDirectoryHandle(folder, { create: true });
-      for (const sub of ["manuscript", "audio", "exports"]) await dir.getDirectoryHandle(sub, { create: true });
-      if (originalFile) { try { await writeFile(await dir.getDirectoryHandle("manuscript"), safeFolder(originalFile.name), originalFile); } catch (e) { console.warn(e); } }
-      const narr = ((this.settings && this.settings.narrators) || [])[0] || {};
-      const lchs = chapters.map(c => {
-        const paras = [c.title];
-        c.scenes.forEach((s, i) => { const ps = String(s.text || "").split(/\n[ \t]*\n+/).map(plain).filter(Boolean); if (i && ps.length) paras.push(SCENE_MARK); paras.push(...ps); });
-        return { id: uid(), title: c.title, paras, words: countWords(paras.filter(p => p !== SCENE_MARK).join(" ")), included: !c.front, status: "todo", boothSeconds: 0, notes: "" };
-      });
-      const now = new Date().toISOString();
-      const lb = { version: 1, id: uid(), title: book.title, author: book.penName || book.writer || "", client: "", color: INKS[this.books.length % INKS.length], due: "",
-        rate: { type: "pfh", amount: "" }, myShare: 100, cast: [{ name: narr.name || "Me", share: 100 }], status: "active", notes: "Added from the Writing Desk.",
-        source: { file: originalFile ? originalFile.name : null, method: "writing-desk", options: {} }, chapters: lchs, created: now, updated: now };
-      if (book.series) lb.series = book.series;
-      await writeFile(dir, "book.json", JSON.stringify(lb, null, 1));
-      lb.folder = folder; this.books.push(lb);
-      return lb;
+    // a writing project's details, ready for the Desk's book form
+    deskInfo(t) {
+      return { title: t.name || "", series: t.series || "", seriesNo: t.seriesNo == null ? "" : String(t.seriesNo), penName: t.penName || "", writer: this.nameOf(t.writer) };
+    },
+    async coverBlob(id) { try { return await (await (await this.root.getDirectoryHandle("Covers")).getFileHandle(safeId(id) + ".jpg")).getFile(); } catch (e) { return null; } },
+
+    // a new writing project from a Desk book; lands in the Lamp Room's "Writing projects" for its writer
+    async createTitle(book, stage) {
+      const writer = this.keyOf(book.writer) || "anne", ci = Math.max(0, AUTHOR_KEYS.indexOf(stage || "outline"));
+      const t = { kind: "author", status: "active", name: book.title, short: "", writer, publisher: writer, targetWords: 0, due: null,
+        penName: book.penName || "", series: book.series || "", seriesNo: seriesNo(book.seriesNo),
+        priorHours: { anne: 0, jack: 0 }, color: INKS[this.titles.length % INKS.length],
+        stages: AUTHOR_KEYS.map((k, i) => ({ id: "a-" + k, type: k, owner: writer, after: i ? ["a-" + AUTHOR_KEYS[i - 1]] : [], done: i < ci, doneDate: i < ci ? today() : null, estHours: null })) };
+      const id = "t-" + uid();
+      await writeFile(await this.titlesDir(true), safeId(id) + ".json", JSON.stringify(t, null, 1));
+      t.id = id; this.titles.push(t);
+      return t;
+    },
+    // keep a linked project's name, series and pen name in step with the Desk (nothing else is touched)
+    async updateTitle(id, book) {
+      const td = await this.titlesDir(true), cur = await readJson(td, safeId(id) + ".json"); if (!cur) return false;
+      const next = Object.assign({}, cur, { name: book.title, series: book.series || "", seriesNo: seriesNo(book.seriesNo), penName: book.penName || "" });
+      if (JSON.stringify(next) === JSON.stringify(cur)) return false;
+      await writeFile(td, safeId(id) + ".json", JSON.stringify(next, null, 1));
+      const t = this.byId(id); if (t) Object.assign(t, next, { id });
+      return true;
+    },
+    async setCover(id, blob) {
+      const cd = await this.root.getDirectoryHandle("Covers", { create: true });
+      await writeFile(cd, safeId(id) + ".jpg", await toJpeg(blob));
     },
 
     async seedTest() {
-      const bd = await this.root.getDirectoryHandle("Books", { create: true });
-      try { await bd.getDirectoryHandle("Ember Vow"); return; } catch (e) { }
-      await writeFile(this.root, "lamp-room.json", JSON.stringify({ narrators: [{ name: "Anne", pace: 9000 }] }));
-      const d = await bd.getDirectoryHandle("Ember Vow", { create: true });
-      await writeFile(d, "book.json", JSON.stringify({ version: 1, id: "lamptest1", title: "Ember Vow", author: "Pen Name Two", chapters: [
-        { id: "c0", title: "Front matter", paras: ["Ember Vow", "Copyright 2026"], included: false, words: 4 },
-        { id: "c1", title: "Chapter 1", paras: ["Chapter 1", "The vow was made in smoke.", { r: [["“Say it,” ", "n"], ["she said.", "f"]] }, "⁂", "Later, the ash settled."], included: true, words: 15 },
-        { id: "c2", title: "Chapter 2: Cinders", paras: ["Chapter 2", "Cinders", "He didn't say it."], included: true, words: 6 }] }, null, 1));
+      const td = await this.titlesDir(true);
+      if (await readJson(td, "t-lamptest1.json")) return;
+      await writeFile(this.root, "lamp-room.json", JSON.stringify({ narrators: [{ name: "Anne", pace: 9000 }, { name: "Jack", pace: 2000 }] }));
+      await writeFile(td, "t-lamptest1.json", JSON.stringify({ kind: "author", status: "active", name: "Ember Vow", writer: "anne", publisher: "anne", penName: "Pen Name Two", series: "Ash Court", seriesNo: 2, color: "#8c3b55",
+        stages: AUTHOR_KEYS.map((k, i) => ({ id: "a-" + k, type: k, owner: "anne", after: i ? ["a-" + AUTHOR_KEYS[i - 1]] : [], done: i < 1, doneDate: null })) }, null, 1));
+      await writeFile(td, "t-narr1.json", JSON.stringify({ kind: "narration", status: "active", name: "Someone Else's Audiobook", stages: [] }));
+      const cv = document.createElement("canvas"); cv.width = 200; cv.height = 300; const g = cv.getContext("2d"); g.fillStyle = "#8c3b55"; g.fillRect(0, 0, 200, 300); g.fillStyle = "#fff"; g.font = "28px serif"; g.fillText("EMBER", 40, 150);
+      const blob = await new Promise(r => cv.toBlob(r, "image/jpeg"));
+      await writeFile(await this.root.getDirectoryHandle("Covers", { create: true }), "t-lamptest1.jpg", blob);
     }
   };
   window.Lamp = Lamp;

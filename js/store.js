@@ -151,6 +151,20 @@ This folder is The Writing Desk's library. Everything here is plain files.
       await this.saveBook(book);
       return book;
     },
+    // imported chapters into a book that exists: an untouched starter (no words at all) is cleared first; otherwise they go after
+    async importInto(book, chapters) {
+      if (!this.bookWords(book)) {
+        const md = await dirAt(await this.bookDir(book, true), ["Manuscript"], true);
+        for (const c of book.chapters) { try { await md.removeEntry(c.folder, { recursive: true }); } catch (e) { } }
+        book.chapters = [];
+      }
+      for (const c of chapters) {
+        const ch = await this.addChapter(book, c.title, null, true); ch.beats = c.beats || "";
+        for (const s of c.scenes) await this.addScene(book, ch, s.title, null, s.text || "", true);
+      }
+      await this.saveBook(book);
+      return book;
+    },
     async saveBook(book) {
       book.updated = new Date().toISOString();
       const dir = await this.bookDir(book, true);

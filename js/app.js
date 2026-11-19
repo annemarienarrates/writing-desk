@@ -138,7 +138,7 @@
     $$("#nav a[data-r]").forEach(a => a.classList.toggle("on", a.dataset.r === route.name));
     document.body.classList.toggle("on-desk", route.name === "book");
     if (route.name !== "book") { E.book = E.sc = E.ch = null; setSaved(""); }
-    ({ shelf: viewShelf, new: viewNew, settings: viewSettings, book: viewBook }[route.name] || viewShelf)();
+    ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook }[route.name] || viewShelf)();
   }
   addEventListener("hashchange", guard(go));
 
@@ -177,37 +177,46 @@
     void b2;
   }
 
-  // ---------- the Lamp Room link ----------
+  // ---------- the Lamp Room link: writing projects ----------
   function lampOffer() {
-    if (Lamp.state === "ready") return `<label class="check lampbox"><input type="checkbox" name="toLamp" checked> Also add it to the Lamp Room (<i>${esc(Lamp.name())}</i>)</label>`;
-    return `<p class="small muted lampbox">${Lamp.state === "needs-permission" ? `To add it to the Lamp Room too, <a href="#" data-lampconnect>connect the Lamp Room library</a> first.` : `Connect the Lamp Room library in <a href="#/settings">Settings</a> to add new books there too.`}</p>`;
+    if (Lamp.state === "ready") return `<label class="check lampbox"><input type="checkbox" name="toLamp" checked> Also add it to the writer's projects in the Lamp Room</label>`;
+    return `<p class="small muted lampbox">${Lamp.state === "needs-permission" ? `To add it to your Lamp Room projects too, <a href="#" data-lampconnect>connect the Lamp Room library</a> first.` : `Connect the Lamp Room library in <a href="#/settings">Settings</a> to add new books to your projects there too.`}</p>`;
   }
   function wireLampConnect(root, after) {
     $$("[data-lampconnect]", root).forEach(a => a.onclick = guard(async e => { e.preventDefault(); await Lamp.connect(); toast("Lamp Room library connected."); after ? after() : go(); }));
   }
-  async function deskChaptersWithText(book) {
-    const out = [];
-    for (const c of book.chapters) { const scenes = []; for (const s of c.scenes) scenes.push({ title: s.title, text: (await Store.readScene(book, c, s)).text }); out.push({ title: c.title, scenes }); }
-    return out;
+  async function sendToLamp(book, stage) {
+    const t = await Lamp.createTitle(book, stage);
+    book.lampTitle = t.id; await Store.saveBook(book);
+    if (book.cover) { try { const f = await (await (await Store.bookDir(book)).getFileHandle(book.cover)).getFile(); await Lamp.setCover(t.id, f); } catch (e) { console.warn(e); } }
+    return t;
   }
-  async function sendToLamp(book, chapters, file) {
-    const lb = await Lamp.createFromDesk(book, chapters || await deskChaptersWithText(book), file);
-    book.lamp = { id: lb.id, folder: lb.folder }; await Store.saveBook(book);
-    return lb;
-  }
-  async function bringFromLamp(lb) {
-    const chapters = Lamp.toDeskChapters(lb);
-    const pen = Store.pens().find(p => p.pen === lb.author);
-    await modal(`<h2>Bring “${esc(lb.title)}” to the Desk</h2>
-      <p class="small">The text comes over as chapters and scenes, split at its scene breaks. The Lamp Room's copy stays exactly as it is, with its parts and recordings, and the two are linked.</p>
-      <form id="bf">${bookFields({ title: lb.title, penName: pen ? pen.pen : "", writer: pen ? pen.writer : "", series: lb.series || "" })}
-      <div class="found">${chapters.map((c, i) => `<label class="check"><input type="checkbox" data-i="${i}" ${c.front ? "" : "checked"}> <span class="grow">${esc(c.title)}</span><span class="muted small">${c.scenes.length} scene${c.scenes.length === 1 ? "" : "s"} · ${num(c.words)} words</span></label>`).join("")}</div>
-      <div class="row end"><button type="button" class="btn quiet" data-close>Cancel</button><button class="btn primary">Bring it over</button></div></form>`,
+  // a Lamp Room writing project → a Desk book with its details and cover (the manuscript gets imported here later)
+  async function bringFromLamp(t) {
+    const v = Lamp.deskInfo(t);
+    if (v.penName && !Store.pens().some(p => p.pen === v.penName)) { const w = (Store.settings.writers || []).find(w => w.name === v.writer) || (Store.settings.writers || [])[0]; if (w) { w.pens = (w.pens || []).filter(Boolean).concat([v.penName]); await Store.saveSettings(); } }
+    await modal(`<h2>Open “${esc(t.name)}” in the Writing Desk</h2>
+      <p class="small">Its details and cover come over from the Lamp Room, and the two stay linked. It starts as an empty book; import the manuscript into it when you're ready.</p>
+      <form id="bf">${bookFields(v)}
+      <div class="row end"><button type="button" class="btn quiet" data-close>Cancel</button><button class="btn primary">Put it on the Desk</button></div></form>`,
       { wide: true, mount: (d, close) => { const f = $("#bf", d); wirePen(f);
-        f.onsubmit = guard(async e => { e.preventDefault(); const keep = $$("[data-i]", f).filter(c => c.checked).map(c => chapters[+c.dataset.i]); if (!keep.length) { toast("Tick at least one chapter."); return; }
-          const info = formInfo(f); if (!info.title) return;
-          const b = await Store.createBook(info, keep); b.lamp = { id: lb.id, folder: lb.folder }; await Store.saveBook(b);
+        f.onsubmit = guard(async e => { e.preventDefault(); const info = formInfo(f); if (!info.title) return;
+          const b = await Store.createBook(info); b.lampTitle = t.id; await Store.saveBook(b);
+          const cov = await Lamp.coverBlob(t.id); if (cov) await Store.setCover(b, cov);
+          if (info.title !== t.name || info.series !== (t.series || "") || info.penName !== (t.penName || "") || String(info.seriesNo) !== String(t.seriesNo == null ? "" : t.seriesNo)) await Lamp.updateTitle(t.id, b);
           close(); toast("“" + b.title + "” is on the Desk, linked to the Lamp Room."); location.hash = "#/book/" + encodeURIComponent(b.folder); }); } });
+  }
+  // the ✒ icon on a Lamp Room writing project lands here
+  async function viewTitle() {
+    const id = route.a;
+    const linked = Store.books.find(b => b.lampTitle === id);
+    if (linked) { location.replace("#/book/" + encodeURIComponent(linked.folder)); return; }
+    if (Lamp.state === "needs-permission") { main.innerHTML = `<div class="gate card"><h2>One click first</h2><p>Chrome needs your OK to open the Lamp Room library from the Writing Desk. It only asks once.</p><button class="btn primary" id="lc">Connect the Lamp Room library</button></div>`; $("#lc").onclick = guard(async () => { await Lamp.connect(); viewTitle(); }); return; }
+    if (Lamp.state !== "ready") { main.innerHTML = `<div class="gate card"><h2>Connect the Lamp Room</h2><p>Choose the Lamp Room's library folder so the Desk can see your writing projects.</p><button class="btn primary" id="lc">Choose the Lamp Room library…</button></div>`; $("#lc").onclick = guard(async () => { await Lamp.connect(true); viewTitle(); }); return; }
+    await Lamp.load();
+    const t = Lamp.byId(id);
+    if (!t) { main.innerHTML = `<div class="card">That writing project isn't in the Lamp Room library this Desk is connected to. <a href="#/shelf">Back to the shelf</a></div>`; return; }
+    location.replace("#/shelf"); await bringFromLamp(t);
   }
 
   // ---------- bookshelf ----------
@@ -228,14 +237,17 @@
       ${!Store.books.length ? `<div class="card empty"><h2>No books yet</h2><p>Start a book from scratch, or bring in a manuscript you already have.</p><a class="btn primary" href="#/new">New book</a></div>` : ""}
       ${order.map(k => `<section class="shelf"><h3>${k ? esc(k) : "Standalone"}</h3><div class="shelf-row">${groups[k].map(b => {
         const love = Store.openLove(b).length;
-        const lampMark = b.lamp ? ` · <span title="Also in the Lamp Room">🪔</span>` : "";
+        const lampMark = b.lampTitle ? ` · <span title="Linked to a writing project in the Lamp Room">🪔</span>` : "";
         return `<a class="spine" href="#/book/${encodeURIComponent(b.folder)}" data-f="${esc(b.folder)}" style="--h:${hue(b.title)}">
           <div class="cov"><div class="cov-t">${esc(b.title)}</div><div class="cov-a">${esc(b.penName || "")}</div></div>
           <div class="meta"><b>${esc(b.title)}</b><span>${b.series && b.seriesNo ? "Book " + esc(b.seriesNo) + " · " : ""}${num(Store.bookWords(b))} words${lampMark}${love ? ` · <span class="lovec" title="Love scenes still to write">♥ ${love}</span>` : ""}</span>${b.penName ? `<span class="muted">${esc(b.penName)}</span>` : ""}</div></a>`;
       }).join("")}</div></section>`).join("")}
-      ${Lamp.state === "ready" && Lamp.unlinked().length ? `<section class="shelf"><h3>In the Lamp Room, not on the Desk yet</h3><div class="lamp-row">${Lamp.unlinked().map(lb => `<div class="card lampbook"><b>${esc(lb.title)}</b><span class="small muted">${esc(lb.author || "")}${lb.author ? " · " : ""}${(lb.chapters || []).filter(c => c.included !== false).length} chapters</span><button class="btn small" data-bring="${esc(lb.id)}">Open in the Writing Desk</button></div>`).join("")}</div></section>` : ""}
-      ${Lamp.state === "needs-permission" ? `<div class="card hint">Your Lamp Room books can show up here too. <a href="#" data-lampconnect>Connect the Lamp Room library</a> (Chrome asks once).</div>` : ""}`;
+      ${Lamp.state === "ready" && Lamp.unlinked().length ? `<section class="shelf"><h3>Writing projects in the Lamp Room, not on the Desk yet</h3><div class="shelf-row">${Lamp.unlinked().map(t => `<div class="spine lampspine" style="--h:${hue(t.name || "")}">
+          <div class="cov" data-lcov="${esc(t.id)}"><div class="cov-t">${esc(t.name)}</div><div class="cov-a">${esc(t.penName || "")}</div></div>
+          <div class="meta"><b>${esc(t.name)}</b><span>${t.series ? esc(t.series) + (t.seriesNo != null ? " #" + esc(t.seriesNo) : "") : "Standalone"}</span><button class="btn small" data-bring="${esc(t.id)}">Open in the Writing Desk</button></div></div>`).join("")}</div></section>` : ""}
+      ${Lamp.state === "needs-permission" ? `<div class="card hint">Your Lamp Room writing projects can show up here too. <a href="#" data-lampconnect>Connect the Lamp Room library</a> (Chrome asks once).</div>` : ""}`;
     $$("[data-bring]").forEach(b => b.onclick = guard(() => bringFromLamp(Lamp.byId(b.dataset.bring))));
+    for (const el of $$("[data-lcov]")) { const blob = await Lamp.coverBlob(el.dataset.lcov); if (blob) { el.style.backgroundImage = `url("${URL.createObjectURL(blob)}")`; el.classList.add("img"); } }
     wireLampConnect(main);
     const setF = (k, v) => { f[k] = v; localStorage.setItem("wd-shelf", JSON.stringify(f)); viewShelf(); };
     $("#fpen") && ($("#fpen").onchange = e => setF("pen", e.target.value));
@@ -259,44 +271,47 @@
   async function readAnyText(file) { return /\.docx$/i.test(file.name) ? Import.blocksToMarkdown(await Import.readBlocks(await file.arrayBuffer())) : await file.text(); }
 
   function viewNew() {
-    main.innerHTML = `<div class="view-header"><h2>New book</h2></div>
-      <div class="two">
-        <form class="card" id="fresh"><h3>Start fresh</h3>${bookFields()}<p class="small muted">Starts with Chapter 1, Scene 1.</p>${lampOffer()}<button class="btn primary">Create book</button></form>
-        <div class="card" id="imp"><h3>Import a manuscript</h3>
+    const into = route.name === "import" ? Store.byFolder(route.a) : null;
+    if (route.name === "import" && !into) { location.hash = "#/new"; return; }
+    main.innerHTML = `<div class="view-header"><h2>${into ? "Import a manuscript into “" + esc(into.title) + "”" : "New book"}</h2></div>
+      <div class="${into ? "" : "two"}">
+        ${into ? "" : `<form class="card" id="fresh"><h3>Start fresh</h3>${bookFields()}<p class="small muted">Starts with Chapter 1, Scene 1.</p>${lampOffer()}<button class="btn primary">Create book</button></form>`}
+        <div class="card" id="imp"><h3>${into ? "The manuscript" : "Import a manuscript"}</h3>
+          ${into && Store.bookWords(into) ? `<p class="small"><b>This book already has ${num(Store.bookWords(into))} words.</b> The imported chapters go after the ones it has; nothing is replaced.</p>` : ""}
           <p class="small">A Word <b>.docx</b> (or .md / .txt). Chapters are split at its headings, or at lines like “Chapter 12” when it has none, and scenes at its scene breaks (<code>* * *</code>, <code>#</code>, <code>***</code>).</p>
           <label class="file">Manuscript<input type="file" id="msf" accept=".docx,.md,.txt"></label>
           <div id="prev"></div></div></div>`;
-    const fr = $("#fresh"); wirePen(fr);
+    const fr = $("#fresh");
     wireLampConnect(main, viewNew);
-    fr.onsubmit = guard(async e => { e.preventDefault(); const b = await Store.createBook(formInfo(fr));
-      if (fr.elements.toLamp && fr.elements.toLamp.checked) await sendToLamp(b);
-      toast("“" + b.title + "” is on the shelf" + (b.lamp ? " and in the Lamp Room." : ".")); location.hash = "#/book/" + encodeURIComponent(b.folder); });
+    fr && wirePen(fr);
+    fr && (fr.onsubmit = guard(async e => { e.preventDefault(); const b = await Store.createBook(formInfo(fr));
+      if (fr.elements.toLamp && fr.elements.toLamp.checked) await sendToLamp(b, "outline");
+      toast("“" + b.title + "” is on the shelf" + (b.lampTitle ? " and in your Lamp Room projects." : ".")); location.hash = "#/book/" + encodeURIComponent(b.folder); }));
     $("#msf").onchange = guard(async e => {
       const file = e.target.files[0]; if (!file) return;
       const blocks = /\.docx$/i.test(file.name) ? await Import.readBlocks(await file.arrayBuffer()) : Import.blocksFromText(await file.text());
       const chapters = Import.splitManuscript(blocks);
       if (!chapters.length) { toast("No text found in that file."); return; }
       const total = chapters.reduce((a, c) => a + c.words, 0);
-      $("#prev").innerHTML = `<form id="impf">${bookFields({ title: file.name.replace(/\.\w+$/, "") })}
+      $("#prev").innerHTML = `<form id="impf">${into ? "" : bookFields({ title: file.name.replace(/\.\w+$/, "") })}
         <h3>What we found: ${chapters.length} chapter${chapters.length === 1 ? "" : "s"}, ${num(total)} words</h3>
         <div class="found">${chapters.map((c, i) => `<label class="check"><input type="checkbox" data-i="${i}" ${c.front && c.words < 300 ? "" : "checked"}> <span class="grow">${esc(c.title)}</span><span class="muted small">${c.scenes.length} scene${c.scenes.length === 1 ? "" : "s"} · ${num(c.words)} words</span></label>`).join("")}</div>
         <p class="small muted">Untick anything you don't want, such as a title page or copyright page.</p>
         <label class="file">Story bible and codex files (optional, .docx, .md or .txt; pick several)<input type="file" id="reff" multiple accept=".docx,.md,.txt"></label>
         <p class="small muted">These go on the book's reference shelf as read-only copies; the original files are kept beside them.</p>
-        ${lampOffer()}<button class="btn primary">Import book</button></form>`;
-      const f = $("#impf"); wirePen(f); wireLampConnect(f, () => $("#msf").dispatchEvent(new Event("change")));
+        ${into ? "" : lampOffer()}<button class="btn primary">${into ? "Import into this book" : "Import book"}</button></form>`;
+      const f = $("#impf"); into || wirePen(f); wireLampConnect(f, () => $("#msf").dispatchEvent(new Event("change")));
       f.onsubmit = guard(async ev => {
         ev.preventDefault();
         const keep = $$("[data-i]", f).filter(c => c.checked).map(c => chapters[+c.dataset.i]);
         if (!keep.length) { toast("Tick at least one chapter."); return; }
-        const info = formInfo(f); if (!info.title) { toast("Give the book a title."); return; }
+        const info = into ? null : formInfo(f); if (info && !info.title) { toast("Give the book a title."); return; }
         toast("Importing…");
-        const b = await Store.createBook(info, keep);
-        const od = await (await Store.bookDir(b, true)).getDirectoryHandle("Manuscript", { create: true }); void od;
+        const b = into ? await Store.importInto(into, keep) : await Store.createBook(info, keep);
         await Store.addReference(b, "Imported manuscript - " + file.name.replace(/\.\w+$/, "") + ".md", "# Imported manuscript\n\nThe text exactly as it came in from " + file.name + ", before any editing.\n\n" + keep.map(c => "## " + c.title + "\n\n" + c.scenes.map(s => s.text).join("\n* * *\n\n")).join("\n"), file);
         for (const rf of $("#reff").files) await Store.addReference(b, rf.name.replace(/\.\w+$/, "") + ".md", await readAnyText(rf), /\.docx$/i.test(rf.name) ? rf : null);
-        if (f.elements.toLamp && f.elements.toLamp.checked) await sendToLamp(b, keep, file);
-        toast("“" + b.title + "” is on the shelf: " + keep.length + " chapters.");
+        if (f.elements.toLamp && f.elements.toLamp.checked) await sendToLamp(b, "revise");
+        toast(into ? keep.length + " chapters imported into “" + b.title + "”." : "“" + b.title + "” is on the shelf: " + keep.length + " chapters" + (b.lampTitle ? ", and in your Lamp Room projects." : "."));
         location.hash = "#/book/" + encodeURIComponent(b.folder);
       });
     });
@@ -444,12 +459,17 @@
     } else {
       box.innerHTML = `<form id="bookf">${bookFields(book)}<button class="btn small primary">Save details</button></form>
         <h3>Cover</h3><div class="row"><label class="btn small file-btn">${book.cover ? "Replace cover…" : "Add a cover…"}<input type="file" id="covf" accept="image/*" hidden></label></div>
-        <h3>Lamp Room</h3>${book.lamp ? `<p class="small">Linked to the Lamp Room's copy. <a href="${Lamp.url(book.lamp.id)}" target="_blank" rel="noopener">Open it in the Lamp Room ↗</a></p>` : Lamp.state === "ready" ? `<button class="btn small" id="tolamp">Add this book to the Lamp Room</button><p class="small muted">Adds a new Lamp Room book with today's text, ready for narration.</p>` : `<p class="small muted">Connect the Lamp Room library in <a href="#/settings">Settings</a> to link this book.</p>`}
+        <h3>Manuscript</h3><a class="btn small" href="#/import/${encodeURIComponent(book.folder)}">Import a manuscript into this book…</a>
+        <h3>Lamp Room</h3>${book.lampTitle ? `<p class="small">Linked to its writing project in the Lamp Room. Title, series, pen name and cover changes here go there too. <a href="${Lamp.url()}" target="lamp-room">Open the Lamp Room ↗</a></p>` : Lamp.state === "ready" ? `<button class="btn small" id="tolamp">Add to the writer's projects in the Lamp Room</button>` : `<p class="small muted">Connect the Lamp Room library in <a href="#/settings">Settings</a> to link this book.</p>`}
         <h3>Files</h3><p class="small muted">This book's folder in your library: <code>Books/${esc(book.folder)}</code>. Each scene is a plain <code>.md</code> file; <code>CONTENTS.md</code> lists them in order.</p>`;
       const f = $("#bookf"); wirePen(f);
-      f.onsubmit = guard(async e => { e.preventDefault(); const info = formInfo(f); if (!info.title) return; await Store.updateBook(book, info); $(".bk-title span").textContent = book.title; toast("Saved."); });
-      $("#tolamp") && ($("#tolamp").onclick = guard(async () => { await saveNow(); await sendToLamp(book); toast("Added to the Lamp Room."); renderPanel(); }));
-      $("#covf").onchange = guard(async e => { const file = e.target.files[0]; if (!file) return; await Store.setCover(book, file); toast("Cover on."); });
+      f.onsubmit = guard(async e => { e.preventDefault(); const info = formInfo(f); if (!info.title) return; await Store.updateBook(book, info); $(".bk-title span").textContent = book.title;
+        if (book.lampTitle && Lamp.state === "ready") await Lamp.updateTitle(book.lampTitle, book).catch(err => toast("Saved here, but the Lamp Room couldn't be updated: " + err.message));
+        toast("Saved."); });
+      $("#tolamp") && ($("#tolamp").onclick = guard(async () => { await sendToLamp(book, Store.bookWords(book) ? "draft" : "outline"); toast("Added to your Lamp Room projects."); renderPanel(); }));
+      $("#covf").onchange = guard(async e => { const file = e.target.files[0]; if (!file) return; await Store.setCover(book, file);
+        if (book.lampTitle && Lamp.state === "ready") await Lamp.setCover(book.lampTitle, file).catch(err => console.warn(err));
+        toast("Cover on" + (book.lampTitle && Lamp.state === "ready" ? ", here and in the Lamp Room." : ".")); });
     }
   }
 
@@ -525,9 +545,9 @@
         <p class="small muted">The themes come straight from the Lamp Room, so a theme added there shows up here too.</p></div>
       <div class="card"><h3>Writers and pen names</h3><div id="wr"></div><button class="btn small" id="addw">+ Writer</button>
         <p class="small muted">Each book is filed under a writer and a pen name. The bookshelf can filter by either.</p></div>
-      <div class="card"><h3>Lamp Room</h3>${Lamp.state === "ready" ? `<p>Connected to <b>${esc(Lamp.name())}</b>: ${Lamp.books.length} book${Lamp.books.length === 1 ? "" : "s"}.</p>` : Lamp.state === "needs-permission" ? `<p>The Lamp Room library this browser uses, <b>${esc(Lamp.name())}</b>, needs your OK.</p>` : `<p>Not connected yet.</p>`}
+      <div class="card"><h3>Lamp Room</h3>${Lamp.state === "ready" ? `<p>Connected to <b>${esc(Lamp.name())}</b>: ${Lamp.titles.length} writing project${Lamp.titles.length === 1 ? "" : "s"}.</p>` : Lamp.state === "needs-permission" ? `<p>The Lamp Room library this browser uses, <b>${esc(Lamp.name())}</b>, needs your OK.</p>` : `<p>Not connected yet.</p>`}
         <div class="row">${Lamp.state === "ready" ? "" : `<button class="btn primary" id="lampc">${Lamp.state === "needs-permission" ? "Connect the Lamp Room library" : "Choose the Lamp Room library…"}</button>`}${Store.testMode ? "" : `<button class="btn quiet" id="lampn">Use a different folder…</button>`}</div>
-        <p class="small muted">New books can go into both apps at once, and Lamp Room books can be opened here. The Desk only adds new books to the Lamp Room; it never changes one that's already there.</p></div>
+        <p class="small muted">New books can go into your Lamp Room writing projects at the same time, and writing projects there can be opened here. The Desk only touches writing projects: their title, series, pen name and cover. It never changes audio projects, stages, hours or dates.</p></div>
       <div class="card"><h3>Library</h3><p>This computer's library: <b>${esc(Store.folderName())}</b></p>
         <div class="row"><button class="btn" id="bk">Back up library…</button>${Store.testMode ? "" : '<button class="btn quiet" id="chg">Use a different folder…</button>'}</div>
         <p class="small muted">The backup is one .zip of everything: books, history and seals. Time Machine backs the folder up too.</p>
