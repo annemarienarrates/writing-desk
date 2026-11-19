@@ -1,0 +1,12 @@
+{
+  "name": "The Writing Desk",
+  "short_name": "Writing Desk",
+  "description": "Drafting desk for Jack & Anne's books.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#1b1a19",
+  "icons": [ { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" } ]
+}
