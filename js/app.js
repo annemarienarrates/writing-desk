@@ -17,6 +17,16 @@
     html.dataset.theme = S.theme || "ledger";
     html.style.setProperty("--wd-size", (S.textSize || 19) + "px");
   }
+  // the bookshelf's wall: drawn wood panelling in the theme's colours, your own picture tinted by the theme, or plain
+  let wallUrl = null;
+  async function applyShelfWall(on) {
+    const b = document.body, mode = Store.settings.shelfWall || "wood";
+    b.classList.toggle("on-shelf", on); b.classList.toggle("wall-wood", on && mode === "wood"); b.classList.toggle("wall-photo", on && mode === "photo");
+    if (on && mode === "photo") {
+      if (!wallUrl) { try { const f = await (await Store.root.getFileHandle("shelf-wall.jpg")).getFile(); wallUrl = URL.createObjectURL(f); } catch (e) { } }
+      b.style.setProperty("--wall-img", wallUrl ? `url("${wallUrl}")` : "none");
+    }
+  }
   function chip(id, text, cls) { const c = $("#" + id); c.textContent = text || ""; c.className = "chip" + (text ? "" : " hidden") + (cls ? " " + cls : ""); }
 
   // ---------- dialogs ----------
@@ -137,6 +147,7 @@
     route = { name: h[0] || "shelf", a: h[1], b: h[2] };
     $$("#nav a[data-r]").forEach(a => a.classList.toggle("on", a.dataset.r === route.name));
     document.body.classList.toggle("on-desk", route.name === "book");
+    applyShelfWall(route.name === "shelf");
     if (route.name !== "book") { E.book = E.sc = E.ch = null; setSaved(""); }
     ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook }[route.name] || viewShelf)();
   }
@@ -234,7 +245,7 @@
         ${pens.length ? `<select id="fpen"><option value="">All pen names</option>${pens.map(p => `<option ${f.pen === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
         ${writers.length > 1 ? `<select id="fwr"><option value="">All writers</option>${writers.map(p => `<option ${f.writer === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
         <a class="btn primary" href="#/new">New book</a></div></div>
-      ${(S.writers || []).length === 1 && S.writers[0].name === "Me" ? `<div class="card hint">Add your name and pen names in <a href="#/settings">Settings</a> so books can be filed under them.</div>` : ""}
+      ${!(S.writers || []).some(w => (w.name && w.name !== "Me") || (w.pens || []).some(Boolean)) ? `<div class="card hint">Add your name and pen names in <a href="#/settings">Settings</a> so books can be filed under them.</div>` : ""}
       ${!Store.books.length ? `<div class="card empty"><h2>No books yet</h2><p>Start a book from scratch, or bring in a manuscript you already have.</p><a class="btn primary" href="#/new">New book</a></div>` : ""}
       ${order.map(k => `<section class="shelf"><h3>${k ? esc(k) : "Standalone"}</h3><div class="shelf-row">${groups[k].map(b => {
         const love = Store.openLove(b).length;
@@ -520,6 +531,7 @@
         ${done ? `<span class="badge ok">Done ✓</span>` : Forge.current(book) === s.key ? `<span class="badge">You are here</span>` : ""}</div>
       ${blocked ? `<div class="card hint small">Not ready yet: <b>${esc(blocked.item[1])}</b> in ${esc(blocked.stage.label)} still needs an approve. You can still look ahead.</div>` : ""}
       <p>${esc(s.intro)}</p>
+      ${s.guide ? `<details class="card fguide" ${done ? "" : "open"}><summary><b>A quick guide</b></summary><div class="guide">${s.guide}</div></details>` : ""}
       ${!book.series ? `<p class="small muted">Tip: give the book a series and book number (Book tab, right) so the prompts name them.</p>` : ""}
       <div class="card fprompt"><div class="small muted">Paste into the series' Claude Project chat</div><pre id="fp">${esc(s.prompt(ctx))}</pre><button class="btn small" id="fpc">Copy</button></div>
       <h3>Checklist</h3><div class="fchecks">${s.items.map(([id, label, gate]) => `<label class="check fcheck ${gate ? "gate" : ""}"><input type="checkbox" data-ck="${id}" ${Forge.checked(book, s.key, id) ? "checked" : ""}> <span>${esc(label)}</span>${gate ? `<span class="badge">gate: approve</span>` : ""}</label>`).join("")}</div>
@@ -746,6 +758,8 @@
         <label>Theme<select id="th">${THEMES.map(([k, l]) => `<option value="${k}" ${S.theme === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
         <label>Text size<input type="range" id="ts" min="15" max="26" value="${S.textSize || 19}"></label>
         <label>Editor<select id="md"><option value="page" ${S.mode !== "plain" ? "selected" : ""}>Book page</option><option value="plain" ${S.mode === "plain" ? "selected" : ""}>Plain</option></select></label></div>
+        <label>Bookshelf wall<select id="wall"><option value="wood" ${(S.shelfWall || "wood") === "wood" ? "selected" : ""}>Wood shelves (in the theme's colours)</option><option value="photo" ${S.shelfWall === "photo" ? "selected" : ""}>My own picture, tinted by the theme</option><option value="plain" ${S.shelfWall === "plain" ? "selected" : ""}>Plain</option></select></label>
+        <div class="row ${S.shelfWall === "photo" ? "" : "hidden"}" id="wallrow"><label class="btn small file-btn">Choose a picture…<input type="file" id="wallf" accept="image/*" hidden></label><span class="small muted">A photo of a library or a bookcase works well. It stays in your library folder.</span></div>
         <label class="check"><input type="checkbox" id="calm" ${S.calm ? "checked" : ""}> Calm: no moving backgrounds</label>
         <p class="small muted">The themes come straight from the Lamp Room, so a theme added there shows up here too.</p></div>
       <div class="card"><h3>Writers and pen names</h3><div id="wr"></div><button class="btn small" id="addw">+ Writer</button>
@@ -765,13 +779,15 @@
     $("#ts").onchange = save;
     $("#md").onchange = e => { S.mode = e.target.value; localStorage.removeItem("wd-mode"); save(); };
     $("#calm").onchange = e => { S.calm = e.target.checked; save(); };
+    $("#wall").onchange = e => { S.shelfWall = e.target.value; $("#wallrow").classList.toggle("hidden", S.shelfWall !== "photo"); save(); };
+    $("#wallf").onchange = guard(async e => { const f = e.target.files[0]; if (!f) return; const w = await (await Store.root.getFileHandle("shelf-wall.jpg", { create: true })).createWritable(); await w.write(f); await w.close(); wallUrl = null; toast("Picture saved. It shows on the bookshelf."); });
     $("#keep").onchange = e => { S.snapKeep = Math.max(10, +e.target.value || 100); save(); };
     const drawW = () => {
       $("#wr").innerHTML = (S.writers || []).map((w, i) => `<div class="fields wrow"><label>Writer<input data-w="${i}" value="${esc(w.name)}"></label>
         ${[0, 1].concat((w.pens || []).slice(2).map((_, j) => j + 2)).map(j => `<label>Pen name ${j + 1}<input data-p="${i}:${j}" value="${esc((w.pens || [])[j] || "")}"></label>`).join("")}
         <button class="btn small quiet" data-morep="${i}" title="Another pen name">+ pen name</button>${S.writers.length > 1 ? `<button class="btn small quiet" data-delw="${i}" title="Remove writer">✕</button>` : ""}</div>`).join("");
-      $$("[data-w]").forEach(x => x.onchange = () => { S.writers[+x.dataset.w].name = x.value.trim() || "Writer"; save(); });
-      $$("[data-p]").forEach(x => x.onchange = () => { const [i, j] = x.dataset.p.split(":").map(Number); const p = S.writers[i].pens = S.writers[i].pens || []; p[j] = x.value.trim(); S.writers[i].pens = p.map(v => v || ""); save(); });
+      $$("[data-w]").forEach(x => x.oninput = x.onchange = () => { S.writers[+x.dataset.w].name = x.value.trim() || "Writer"; save(); });
+      $$("[data-p]").forEach(x => x.oninput = x.onchange = () => { const [i, j] = x.dataset.p.split(":").map(Number); const p = S.writers[i].pens = S.writers[i].pens || []; p[j] = x.value.trim(); S.writers[i].pens = p.map(v => v || ""); save(); });
       $$("[data-morep]").forEach(x => x.onclick = () => { const w = S.writers[+x.dataset.morep]; w.pens = (w.pens || []).concat(["", ""]).slice(0, Math.max(2, (w.pens || []).length) + 1); drawW(); });
       $$("[data-delw]").forEach(x => x.onclick = () => { S.writers.splice(+x.dataset.delw, 1); save(); drawW(); });
     };

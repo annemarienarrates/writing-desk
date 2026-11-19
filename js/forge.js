@@ -26,15 +26,43 @@
       intro: "Work through the editor markup, then bring the final manuscript back.",
       prompt: c => `series-forge: ${c.series} Book ${c.n}. My pass on the editor markup is done. Scan the final manuscript in my Writing Desk library (Books/${c.folder}) for merge typos, then run Stage 13 on the changed chapters.`,
       items: [["markup", "Every suggestion accepted or rejected"], ["merge", "Merge-typo scan clean"], ["final", "Manuscript marked final"], ["seal", "Final draft sealed here (🔒 Seal)"]] },
-    { key: "format", label: "Format", lamp: "format", forge: "Stage 19",
+    { key: "format", guide: `<p><b>Ebook first.</b> The formatted .docx from this stage goes into Draft2Digital's free formatter, which makes the EPUB. That EPUB can go to KDP too.</p>
+<p><b>Paperback: when.</b> Once the ebook text is final, so you only lay it out once. A paperback rarely sells many copies in Kindle Unlimited genres, but it makes the ebook look like a bargain next to it, and it's what you sign, give away and send to reviewers. Many authors add paperbacks at launch for book one, and do the rest of a series in a batch.</p>
+<p><b>Paperback: how.</b> Lay out the interior in <b>Vellum</b> (Mac only; the print version is Vellum Press, about $250 one time; the ebook-only version can't make print). Pick a trim size (5.5 × 8.5 in or 6 × 9 in are usual for fiction), export the print PDF, and note the page count. The cover designer needs that page count for the spine width of the full wraparound cover. Order a proof copy before you publish it.</p>`, label: "Format", lamp: "format", forge: "Stage 19",
       intro: "Front matter, back matter and the formatted file, one piece at a time.",
       prompt: c => `series-forge stage 19: ${c.series} Book ${c.n}. Book Build, one piece at a time.`,
-      items: [["title", "Title page"], ["copyright", "Copyright page"], ["content", "Content note"], ["bonus", "Free bonus page"], ["back", "Back matter: review ask, teaser, freebies, links, afterword, also by, about"], ["file", "Formatted .docx built for Draft2Digital"]] },
-    { key: "publish", label: "Publish", lamp: "publish", forge: "Stage 18",
+      items: [["title", "Title page"], ["copyright", "Copyright page"], ["content", "Content note"], ["bonus", "Free bonus page"], ["back", "Back matter: review ask, teaser, freebies, links, afterword, also by, about"], ["file", "Formatted .docx built for Draft2Digital"], ["paper", "Paperback interior (Vellum) and wraparound cover (optional)"]] },
+    { key: "publish", guide: `<p class="small muted">Rules and fees change. Each site's help pages win over this note.</p>
+<p><b>First, one decision: Kindle Unlimited or wide.</b></p>
+<ul><li><b>KDP Select (Kindle Unlimited):</b> the ebook is sold only on Amazon, in 90-day terms that renew on their own. You're paid for KU page reads as well as sales, and get one promotion per term (up to 5 free days, or a Countdown Deal). While it's enrolled, the ebook can't be on Draft2Digital, other stores or your own website. Paperbacks and audiobooks aren't affected.</li>
+<li><b>Wide:</b> Amazon through KDP, and every other store (Apple, Kobo, Barnes &amp; Noble, Google, libraries) through Draft2Digital.</li></ul>
+<p><b>Amazon KDP</b> (kdp.amazon.com)</p>
+<ol><li>Sign in with an Amazon account and fill in the tax interview and bank details first: payments wait on them.</li>
+<li>Create a Kindle eBook: title, subtitle, series name and number, pen name, description (the blurb), and up to 7 keywords and 3 categories from the kit.</li>
+<li>Answer the AI-generated content question honestly (see the checklist).</li>
+<li>Upload the EPUB and the cover (a JPG; KDP's help gives the current size). Check every page in the previewer.</li>
+<li>Pricing: on Amazon.com, ebooks priced $2.99 to $12.99 can take the 70% royalty; outside that range it's 35%. Choose KDP Select here or not.</li>
+<li>Publish. It usually goes live within 72 hours. A pre-order (up to a year ahead) is a good way to collect launch-day sales.</li>
+<li>Paperback: add it from the same book's page ("+ Create paperback") so Amazon links the editions. Upload the print PDF and the wraparound cover, then order a proof.</li></ol>
+<p><b>Draft2Digital</b> (draft2digital.com), for going wide</p>
+<ol><li>Make an account. New accounts pay a one-time $20 activation fee. From the second year there's $12 a year if the account earned under $100 in the last 12 months.</li>
+<li>Add the book: upload the .docx (D2D formats it) or your EPUB, then the cover and the blurb. D2D gives you a free ISBN if you don't have one.</li>
+<li>Pick the stores. Leave Amazon unticked if you publish there yourself through KDP.</li>
+<li>D2D keeps about 10% of the list price, and the store keeps its own share. Payments come monthly.</li>
+<li>D2D Print can make the paperback for the wide stores, or use KDP's paperback for Amazon.</li></ol>`, label: "Publish", lamp: "publish", forge: "Stage 18",
       intro: "The publishing kit, then the uploads. Check KDP's and Draft2Digital's current limits first, every time.",
       prompt: c => `series-forge stage 18: ${c.series} Book ${c.n}. Publishing kit; search the current KDP and Draft2Digital limits first.`,
-      items: [["kdp", "KDP title, series fields, long blurb, keywords and categories"], ["wide", "Wide retail: short blurb, BISAC codes"], ["covers", "Cover prompts finalized and the cover made"], ["ai", "AI disclosure checked against KDP's current wording"], ["upload", "Uploaded (KDP, Draft2Digital)"]] },
-    { key: "market", label: "Market", lamp: "market", forge: "Stage 20 and launch",
+      items: [["route", "Kindle Unlimited or wide: decided"], ["kdp", "KDP title, series fields, long blurb, keywords and categories"], ["wide", "Wide retail: short blurb, BISAC codes"], ["covers", "Cover prompts finalized and the cover made"], ["ai", "AI disclosure checked against KDP's current wording"], ["upload", "Uploaded (KDP, Draft2Digital)"], ["print", "Paperback live and proof copy checked (optional)"]] },
+    { key: "market", guide: `<p><b>The email list comes first.</b> Followers belong to the platform; an email list is yours. Use an email service built for it (MailerLite and similar) and offer something free for signing up: a short story, a bonus scene, a prequel (a "reader magnet"). BookFunnel or StoryOrigin delivers the free book to any device and adds the reader to your list. Put the sign-up link at the front and the back of every book.</p>
+<p><b>Your website.</b> One home: books, series reading order, sign-up and links. You can sell ebooks there directly (a store such as Payhip or Shopify, with BookFunnel delivering the file) and keep far more per sale. You can't do that for an ebook enrolled in Kindle Unlimited.</p>
+<p><b>Author swaps.</b> Trade a mention in your newsletter for one in another author's, in the same genre and with a list of similar size. BookFunnel and StoryOrigin both run newsletter swaps and group promotions, where many authors share one giveaway or sale page.</p>
+<p><b>Where to post.</b> Where your readers already are: genre reader groups on Facebook (read each group's self-promotion rules), TikTok and Instagram (BookTok, Bookstagram), and, for LitRPG, Royal Road, where many series are read as serials first. Post about the book's tropes and moments, not "buy my book". Be steady rather than everywhere.</p>
+<p><b>Discovery sites.</b> Deal newsletters send your discounted or free book to readers who signed up for your genre:</p>
+<ul><li><b>BookBub Featured Deal:</b> the biggest. It's curated and hard to get, so apply often.</li>
+<li><b>Written Word Media:</b> Freebooksy (free), Bargain Booksy (discounted) and genre lists.</li>
+<li><b>Robin Reads, The Fussy Librarian, ENT:</b> smaller and cheaper. Stack a few over five days of a sale.</li></ul>
+<p>Free or $0.99 for book one of a series usually pays off through the later books. Check each site's requirements (reviews, price, days since launch) before booking.</p>
+<p><b>Ads.</b> Amazon Ads and Facebook Ads work best once a series has three or more books for the reader to continue into. Start small and stop what doesn't pay.</p>`, label: "Market", lamp: "market", forge: "Stage 20 and launch",
       intro: "Launch: the hooks, ads, newsletter and ARC copies, then the close-out package.",
       prompt: c => `series-forge stage 20: ${c.series} Book ${c.n}. Close-out package, plus my launch set: hooks, ad copy, newsletter and social posts.`,
       items: [["hooks", "Hooks, tagline and 3 ad variants"], ["news", "Newsletter and social posts"], ["arc", "ARC copies out"], ["launch", "Launch checklist done"], ["close", "Close-out package: Project state current, next book's opener saved"]] }
