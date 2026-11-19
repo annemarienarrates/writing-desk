@@ -25,6 +25,7 @@ This repository holds only the app. Your books never come here. They live as pla
 - **Sprints:** a timer that counts the words added. At the end you can make the result your writing pace (shared with the Lamp Room) or add the time to today's Lamp Room log.
 - **Timeline:** a day and time for every scene, filled in from time words in the text ("the next morning", "three days later", weekdays). It flags days that go backwards, jumps that don't match the text, and weekdays that don't match the dates.
 - **Continuity:** eye colour, hair colour and ages that disagree between chapters and the bible (in People & places).
+- **Series page** (click a series label on the shelf): every book in the series with its stage, words and dates; series totals and book speed; who appears in which book; continuity across the books (eyes and hair must match, ages may only go up); story time across the books. **Start Book N** carries the pen name, genre, cast list and reference shelf into the next book.
 - **Backup:** saves the whole library as one .zip.
 
 ## Built like the Lamp Room

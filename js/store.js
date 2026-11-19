@@ -218,7 +218,8 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
       });
       return L.join("\n");
     },
-    monthWords(book, ym) { let n = 0; for (const [d, w] of Object.entries(book.wordLog || {})) if (d.startsWith(ym)) n += w; return n; },
+    // words written in a month: a day that cut more than it added counts as zero, not as minus
+    monthWords(book, ym) { let n = 0; for (const [d, w] of Object.entries(book.wordLog || {})) if (d.startsWith(ym) && w > 0) n += w; return n; },
     bookWords(book) { return book.chapters.reduce((a, c) => a + this.chapterWords(c), 0); },
     chapterWords(ch) { return ch.scenes.reduce((a, s) => a + (s.words || 0), 0); },
     openLove(book) { const out = []; for (const c of book.chapters) for (const s of c.scenes) if (s.love) out.push({ ch: c, sc: s }); return out; },

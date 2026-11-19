@@ -77,11 +77,13 @@
       const N = "(?:" + [c.name, ...(c.aliases || [])].filter(Boolean).sort((a, b) => b.length - a.length).map(esc).join("|") + ")";
       const R = [
         ["eyes", new RegExp(`\\b${N}['’]s\\s+(?:\\w+\\s+)?(${EYE})(?:[- ]coloured|[- ]colored)?\\s+eyes`, "gi")],
-        ["eyes", new RegExp(`\\b${N}\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${EYE})\\s+eyes`, "gi")],
+        ["eyes", new RegExp(`\\b${N}(?:,[^,.\\n]{1,20},)?\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${EYE})\\s+eyes`, "gi")],
+        ["eyes", new RegExp(`\\b${N}\\b[^.!?\\n“”"]{0,30}\\b(?:her|his|their)\\s+(?:\\w+\\s+)?(${EYE})\\s+eyes`, "gi")],
         ["eyes", new RegExp(`\\b${N}['’]s\\s+eyes\\s+(?:were|are|was|went|turned)\\s+(?:a\\s+)?(${EYE})\\b`, "gi")],
         ["eyes", new RegExp(`\\b${N}\\b[^.\\n]{0,30}\\b(${EYE})[- ]eyed\\b`, "gi")],
         ["hair", new RegExp(`\\b${N}['’]s\\s+(?:\\w+\\s+)?(${HAIR})\\s+(?:hair|curls|braid|locks|waves)`, "gi")],
-        ["hair", new RegExp(`\\b${N}\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${HAIR})\\s+hair`, "gi")],
+        ["hair", new RegExp(`\\b${N}(?:,[^,.\\n]{1,20},)?\\s+(?:had|has)\\s+(?:\\w+\\s+)?(${HAIR})\\s+hair`, "gi")],
+        ["hair", new RegExp(`\\b${N}\\b[^.!?\\n“”"]{0,30}\\b(?:her|his|their)\\s+(?:\\w+\\s+)?(${HAIR})\\s+(?:hair|curls|braid)`, "gi")],
         ["hair", new RegExp(`\\b${N}['’]s\\s+hair\\s+(?:was|is|were)\\s+(?:a\\s+)?(${HAIR})\\b`, "gi")],
         ["age", new RegExp(`\\b${N},\\s+(${AGEW}),`, "gi")],
         ["age", new RegExp(`\\b${N}\\s+(?:was|is|turned|had just turned)\\s+(${AGEW})(?:\\s+years\\s+old|\\b(?=[.,;]))`, "gi")],

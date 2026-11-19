@@ -149,7 +149,7 @@
     document.body.classList.toggle("on-desk", route.name === "book");
     applyShelfWall(route.name === "shelf");
     if (route.name !== "book") { E.book = E.sc = E.ch = null; setSaved(""); }
-    ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook }[route.name] || viewShelf)();
+    ({ shelf: viewShelf, new: viewNew, import: viewNew, title: viewTitle, settings: viewSettings, book: viewBook, series: viewSeries }[route.name] || viewShelf)();
   }
   addEventListener("hashchange", guard(go));
 
@@ -247,7 +247,7 @@
         <a class="btn primary" href="#/new">New book</a></div></div>
       ${!(S.writers || []).some(w => (w.name && w.name !== "Me") || (w.pens || []).some(Boolean)) ? `<div class="card hint">Add your name and pen names in <a href="#/settings">Settings</a> so books can be filed under them.</div>` : ""}
       ${!Store.books.length ? `<div class="card empty"><h2>No books yet</h2><p>Start a book from scratch, or bring in a manuscript you already have.</p><a class="btn primary" href="#/new">New book</a></div>` : ""}
-      ${order.map(k => `<section class="shelf"><h3>${k ? esc(k) : "Standalone"}</h3><div class="shelf-row">${groups[k].map(b => {
+      ${order.map(k => `<section class="shelf"><h3>${k ? `<a class="plaque" href="#/series/${encodeURIComponent(k)}" title="The series: every book, who's in which, continuity">${esc(k)} ›</a>` : "Standalone"}</h3><div class="shelf-row">${groups[k].map(b => {
         const love = Store.openLove(b).length;
         const lampMark = b.lampTitle ? ` · <span title="Linked to a writing project in the Lamp Room">🪔</span>` : "";
         return `<a class="spine" href="#/book/${encodeURIComponent(b.folder)}" data-f="${esc(b.folder)}" style="--h:${hue(b.title)}">
@@ -760,6 +760,85 @@
       }
       await save(); toast(filled ? `Filled in ${filled} scene${filled === 1 ? "" : "s"}. Days you'd already set were kept.` : "Every scene already has a day."); renderTimeline();
     });
+  }
+
+  // ---------- a series: every book in it, side by side ----------
+  async function viewSeries() {
+    const name = route.a, books = Store.books.filter(b => b.series === name).sort((a, b) => (parseFloat(a.seriesNo) || 0) - (parseFloat(b.seriesNo) || 0) || a.title.localeCompare(b.title));
+    if (!books.length) { main.innerHTML = `<div class="card">No books in the series “${esc(name)}”. <a href="#/shelf">Back to the shelf</a></div>`; return; }
+    main.innerHTML = `<div class="view-header"><h2>${esc(name)}</h2></div><p class="muted small">Reading the series…</p>`;
+    // the text of every book, once
+    const texts = {}; for (const b of books) texts[b.folder] = await scenesOf(b);
+    const total = books.reduce((a, b) => a + Store.bookWords(b), 0), month = books.reduce((a, b) => a + Store.monthWords(b, ym()), 0);
+    const spans = books.map(b => Forge.span(b)), fin = spans.filter(x => x.all && x.start && x.finish);
+    const speed = fin.length ? fin.reduce((a, x) => a + daysBetween(x.start, x.finish), 0) / fin.length : null;
+    const first = spans.map(x => x.start).filter(Boolean).sort()[0], perMonth = first ? total / Math.max(1, months(daysBetween(first, Store.today()))) : 0;
+    // everyone on any book's list, merged by name
+    const cast = []; for (const b of books) for (const c of b.cast || []) { const have = cast.find(x => x.name === c.name); if (have) { for (const a of c.aliases || []) if (!have.aliases.includes(a)) have.aliases.push(a); } else cast.push({ name: c.name, kind: c.kind, aliases: [...(c.aliases || [])] }); }
+    const perBook = books.map(b => { const cnt = Cast.count(cast, texts[b.folder]), o = {}; for (const r of Object.values(cnt)) for (const [k, n] of Object.entries(r)) o[k] = (o[k] || 0) + n; return o; });
+    const max = Math.max(1, ...perBook.flatMap(o => Object.values(o)));
+    // continuity across the books (and every book's reference shelf)
+    const sources = [];
+    for (const b of books) {
+      let ref = ""; for (const r of await Store.listReference(b)) if (!/^Imported manuscript/i.test(r.name)) ref += "\n" + await Store.readReference(b, r.name);
+      if (ref.trim()) sources.push({ where: `${b.title}: reference shelf`, book: b, sceneId: null, md: ref });
+      for (const s of texts[b.folder]) sources.push({ where: `${b.title} › ${s.ch}`, book: b, sceneId: s.id, md: s.md });
+    }
+    const conflicts = Cast.continuity(cast, sources).filter(c => c.attr !== "age");
+    // ages: fine to go up from book to book, not down
+    const ageIssues = [];
+    for (const c of cast.filter(c => c.kind === "person")) {
+      let last = null;
+      for (const b of books) {
+        const ages = []; const re = new RegExp(`(?:^|\\b)(?:${[c.name, ...(c.aliases || [])].map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?:,\\s+(\\d{1,3}),|\\s+(?:was|is|turned)\\s+(\\d{1,3})\\b)`, "g");
+        for (const s of sources.filter(s => s.book === b)) { let m; while ((m = re.exec(s.md.replace(/\*+/g, "")))) ages.push(+(m[1] || m[2])); }
+        if (!ages.length) continue;
+        const lo = Math.min(...ages);
+        if (last && lo < last.age) ageIssues.push(`${c.name} is ${last.age} in ${last.book} but ${lo} in ${b.title}, a later book.`);
+        last = { age: Math.max(...ages), book: b.title };
+      }
+    }
+    // story time across the books: Day 1 dates and how many days each book covers
+    const tl = books.map(b => { const days = b.chapters.flatMap(c => c.scenes.map(s => +(s.when || {}).day || 0)).filter(Boolean); const last = days.length ? Math.max(...days) : 0; let end = ""; if (b.storyStart && last) { const t = new Date(b.storyStart + "T12:00:00"); t.setDate(t.getDate() + last - 1); end = t.toISOString().slice(0, 10); } return { b, start: b.storyStart || "", end, days: last }; });
+    const tlIssues = []; for (let i = 1; i < tl.length; i++) { const a = tl[i - 1], c = tl[i]; if (a.end && c.start && c.start < a.end) tlIssues.push(`${c.b.title} starts on ${c.start}, before ${a.b.title} ends (${a.end}). Fine if it's a prequel or overlap.`); }
+    const nextNo = Math.max(0, ...books.map(b => parseFloat(b.seriesNo) || 0)) + 1, lastBook = books[books.length - 1];
+    main.innerHTML = `<div class="view-header"><h2>${esc(name)}</h2><div class="view-header-actions"><a class="btn quiet" href="#/shelf">‹ Shelf</a><button class="btn primary" id="nextbook">Start Book ${nextNo}</button></div></div>
+      <div class="tiles">
+        <div class="tile"><span>Books</span><b>${books.length}</b><em>${fin.length} finished</em></div>
+        <div class="tile"><span>Words</span><b>${num(total)}</b><em>the whole series</em></div>
+        <div class="tile"><span>This month</span><b>${num(month)}</b><em>written in this series</em></div>
+        <div class="tile"><span>Per month</span><b>${perMonth ? num(Math.round(perMonth)) : "—"}</b><em>${first ? "since " + esc(first) : ""}</em></div>
+        <div class="tile"><span>Book speed</span><b>${speed ? months(speed).toFixed(1) + " mo" : "—"}</b><em>${speed ? "average, start to finish" : "after the first finished book"}</em></div></div>
+      <div class="card"><h3>The books</h3><table class="ctable sbooks"><tr><th>#</th><th>Book</th><th>Stage</th><th>Words</th><th>Started</th><th>Finished</th><th></th></tr>
+        ${books.map((b, i) => { const sp = spans[i], cur = Forge.current(b), stg = Forge.STAGES.find(s => s.key === cur); const doneN = Forge.STAGES.filter(s => Forge.isDone(b, s.key)).length;
+          return `<tr><td>${esc(b.seriesNo || "")}</td><td><a href="#/book/${encodeURIComponent(b.folder)}"><b>${esc(b.title)}</b></a>${b.penName ? `<div class="small muted">${esc(b.penName)}</div>` : ""}</td>
+            <td><i class="sbar"><i style="width:${100 * doneN / Forge.STAGES.length}%"></i></i><span class="small">${stg ? esc(stg.label) : "Done ✓"}</span></td><td>${num(Store.bookWords(b))}${b.targetWords ? `<span class="small muted"> / ${num(+b.targetWords)}</span>` : ""}</td>
+            <td class="small">${esc(sp.start || "")}</td><td class="small">${esc(sp.finish || "")}</td><td>${b.lampTitle ? '<span title="Linked to the Lamp Room">🪔</span>' : ""}</td></tr>`; }).join("")}</table></div>
+      <div class="card"><h3>Who's in which book</h3>${cast.length ? `<div class="hscroll"><table class="ctable heat"><tr><th></th>${books.map(b => `<th title="${esc(b.title)}">${esc(b.seriesNo ? "#" + b.seriesNo : b.title.slice(0, 8))}</th>`).join("")}</tr>
+        ${["person", "place"].map(kind => cast.filter(c => c.kind === kind).map(c => `<tr><th>${esc(c.name)}${kind === "place" ? ' <span class="muted small">place</span>' : ""}</th>${perBook.map(o => `<td class="hc" style="--a:${o[c.name] ? 0.15 + 0.85 * o[c.name] / max : 0}">${o[c.name] || ""}</td>`).join("")}</tr>`).join("")).join("")}</table></div>` : `<p class="small muted">No one's on any book's list yet. Open a book's <b>👥 Cast</b> tab to start one; the next book in the series starts with the same list.</p>`}</div>
+      <div class="card"><h3>Continuity across the series</h3>
+        ${conflicts.length || ageIssues.length ? conflicts.map(c => `<div class="crow plain"><span><b>${esc(c.name)}</b>: ${esc(c.attr)}</span></div>${c.values.map(v => `<div class="ex"><b>${esc(v.v)}</b> <span class="muted small">${v.where.map(w => esc(w.where)).join(" · ")}</span></div>`).join("")}`).join("") + ageIssues.map(t => `<div class="ex">${esc(t)}</div>`).join("")
+          : `<p class="small">Nothing disagrees between the books: eyes, hair and ages line up${cast.length ? "" : " (once there's a cast list to check)"}.</p>`}
+        <p class="small muted">Eyes and hair must match in every book and on every reference shelf. Ages may go up from book to book, never down.</p></div>
+      <div class="card"><h3>Story time across the books</h3><table class="ctable"><tr><th>Book</th><th>Day 1</th><th>Days covered</th><th>Last day</th></tr>${tl.map(t => `<tr><td>${esc(t.b.title)}</td><td class="small">${esc(t.start) || '<span class="muted">not set</span>'}</td><td>${t.days || "—"}</td><td class="small">${esc(t.end)}</td></tr>`).join("")}</table>
+        ${tlIssues.map(t => `<div class="ex">${esc(t)}</div>`).join("")}<p class="small muted">Each book's 🕰 Timeline tab sets its Day 1 date and scene days.</p></div>`;
+    $("#nextbook").onclick = guard(() => startNextBook(name, nextNo, books, cast));
+  }
+  // the next book in a series: same pen name, writer and genre; the cast list and the reference shelf come along
+  async function startNextBook(series, no, books, cast) {
+    const prev = books[books.length - 1];
+    const t = await promptBox(`Book ${no} of ${series}: title`, "", "Create");
+    if (!t) return;
+    const b = await Store.createBook({ title: t, series, seriesNo: String(no), penName: prev.penName, writer: prev.writer, genre: prev.genre });
+    b.cast = (cast || prev.cast || []).map(c => ({ ...c, aliases: [...(c.aliases || [])] }));
+    const st = Forge.state(b); st.done.setup = true; st.doneAt.setup = Store.today();   // the series is already set up
+    await Store.saveBook(b);
+    // the newest copy of each reference file from any earlier book (the latest book wins)
+    const copied = new Set();
+    for (const src of [...books].reverse()) for (const r of await Store.listReference(src)) if (!/^Imported manuscript/i.test(r.name) && !copied.has(r.name)) { copied.add(r.name); await Store.addReference(b, r.name, await Store.readReference(src, r.name)); }
+    if (prev.lampTitle && Lamp.state === "ready") await sendToLamp(b, "outline");
+    toast(`“${t}” is Book ${no}: same pen name and cast list, the reference shelf copied over${b.lampTitle ? ", and it's in your Lamp Room projects" : ""}. The Outline tab has the handoff prompt.`, 7000);
+    location.hash = "#/book/" + encodeURIComponent(b.folder);
   }
 
   // ---------- people and places ----------

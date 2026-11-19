@@ -255,3 +255,7 @@ body.on-shelf .spine .cov.img { box-shadow: none; }
 body.on-shelf .spine .meta b { font-size: 1.12rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 body.on-shelf .shelf-row { --row: 345px; }
 body.on-shelf .shelf-row:has(.lampspine) { --row: 385px; }
+.shelf h3 a.plaque { color: inherit; text-decoration: none; }
+.sbooks td { vertical-align: middle; }
+.sbar { display: block; width: 110px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 3px; }
+.sbar i { display: block; height: 100%; background: var(--accent); }
