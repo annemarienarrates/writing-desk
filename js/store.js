@@ -78,9 +78,9 @@ This folder is The Writing Desk's library. Everything here is plain files.
 ## Rules
 1. **Never write to, rename or delete anything in a \`Sealed/\` folder, for any reason.** Sealed versions are locked; the Desk checks their fingerprints.
 2. To change a scene, edit its \`.md\` file in place. Don't rename scene files or move them between folders: the Desk does that.
-3. Don't add or reorder scenes by editing book.json. Ask Anne to do it in the Desk, or write a new scene's text in chat for her to paste.
+3. Don't add or reorder scenes by editing book.json. Ask the writer to do it in the Desk, or write a new scene's text in chat for them to paste.
 4. Love scenes: leave the marker \`[xx — scene]\` and a brief; the authors write those scenes.
-5. If the Desk has the same scene open with unsaved changes, it will ask Anne which version to keep. Nothing is lost either way.
+5. If the Desk has the same scene open with unsaved changes, it will ask the writer which version to keep. Nothing is lost either way.
 `;
 
   const STARTER_CHECKS = {
