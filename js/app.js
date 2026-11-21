@@ -537,7 +537,7 @@
     el.innerHTML = `
       <div class="st"><span>Words</span><b id="stwords">${num(total)}</b>${target ? `<i class="bar"><i style="width:${Math.min(100, 100 * total / target)}%"></i></i><em>of ${num(target)}</em>` : `<em><a href="#" data-booktab>set a target</a></em>`}</div>
       <div class="st"><span>This month</span><b>${num(Store.monthWords(book, ym()))}</b><em>this book</em></div>
-      <div class="st"><span>${esc(book.writer || "You")}'s month</span><b>${num(mine)}</b>${goal ? `<i class="bar"><i style="width:${Math.min(100, 100 * mine / goal)}%"></i></i><em>of ${num(goal)}, all books</em>` : `<em><a href="#/settings">set a goal</a></em>`}</div>
+      <div class="st"><span title="Everything ${esc(book.writer || "you")} wrote this month, across all books, against the monthly goal">All books, this month</span><b>${num(mine)}</b>${goal ? `<i class="bar"><i style="width:${Math.min(100, 100 * mine / goal)}%"></i></i><em>of ${num(goal)}, all books</em>` : `<em><a href="#/settings">set a goal</a></em>`}</div>
       <div class="st"><span>Per month</span><b>${days >= 1 ? num(Math.round(avgMonth)) : "—"}</b><em>${span.start ? (span.finish ? "start to finish" : "since " + esc(new Date(span.start + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }))) : ""}</em></div>
       <div class="st"><span>Book speed</span><b>${speed ? months(speed.days).toFixed(1) + " mo" : "—"}</b><em title="${speed ? `Average start-to-finish time of ${speed.n} finished book${speed.n === 1 ? "" : "s"}` : "Shows once a book is finished"}">${speed ? `avg of ${speed.n}` : "none finished yet"}${span.start && !span.finish ? ` · this: ${months(days).toFixed(1)} mo` : ""}</em></div>
       <div class="st" title="${pace.from === "lamp" ? "Writing pace from the Lamp Room's settings" : "Writing pace from Settings"}"><span>Pace</span><b>${num(pace.wph)}</b><em>words/hr${left ? ` · ${Math.ceil(left / pace.wph)} h left` : ""}</em></div>
@@ -1212,12 +1212,13 @@
     $("#wallf").onchange = guard(async e => { const f = e.target.files[0]; if (!f) return; const w = await (await Store.root.getFileHandle("shelf-wall.jpg", { create: true })).createWritable(); await w.write(f); await w.close(); wallUrl = null; toast("Picture saved. It shows on the bookshelf."); });
     $("#keep").onchange = e => { S.snapKeep = Math.max(10, +e.target.value || 100); save(); };
     const drawW = () => {
-      $("#wr").innerHTML = (S.writers || []).map((w, i) => `<div class="fields wrow"><label>Writer<input data-w="${i}" value="${esc(w.name)}"></label>
+      $("#wr").innerHTML = (S.writers || []).map((w, i) => `<div class="fields wrow"><label>Writer<input data-w="${i}" data-old="${esc(w.name)}" value="${esc(w.name)}"></label>
         ${[0, 1].concat((w.pens || []).slice(2).map((_, j) => j + 2)).map(j => `<label>Pen name ${j + 1}<input data-p="${i}:${j}" value="${esc((w.pens || [])[j] || "")}"></label>`).join("")}
         <label class="short">Monthly goal<input type="number" min="0" step="1000" data-goal="${i}" value="${esc(w.monthGoal || "")}" placeholder="words"></label>
         <label class="short">Writing pace<input type="number" min="100" step="50" data-pace="${i}" value="${esc(w.pace || "")}" placeholder="words/hr"></label>
         <button class="btn small quiet" data-morep="${i}" title="Another pen name">+ pen name</button>${S.writers.length > 1 ? `<button class="btn small quiet" data-delw="${i}" title="Remove writer">✕</button>` : ""}</div>`).join("");
-      $$("[data-w]").forEach(x => x.oninput = x.onchange = () => { S.writers[+x.dataset.w].name = x.value.trim() || "Writer"; save(); });
+      $$("[data-w]").forEach(x => { x.oninput = () => { S.writers[+x.dataset.w].name = x.value.trim() || "Writer"; save(); };
+        x.onchange = guard(async () => { const to = S.writers[+x.dataset.w].name; save(); const n = await Store.renameWriter(x.dataset.old, to); x.dataset.old = to; if (n) toast(`${n} book${n > 1 ? "s" : ""} moved to ${to}`); }); });
       $$("[data-p]").forEach(x => x.oninput = x.onchange = () => { const [i, j] = x.dataset.p.split(":").map(Number); const p = S.writers[i].pens = S.writers[i].pens || []; p[j] = x.value.trim(); S.writers[i].pens = p.map(v => v || ""); save(); });
       $$("[data-goal]").forEach(x => x.oninput = x.onchange = () => { S.writers[+x.dataset.goal].monthGoal = +x.value || 0; save(); });
       $$("[data-pace]").forEach(x => x.onchange = guard(async () => { const w = S.writers[+x.dataset.pace]; if (+x.value > 0) { await setPaceFor(w.name, +x.value); toast("Writing pace saved" + (Lamp.state === "ready" && Lamp.keyOf(w.name) ? ", in the Lamp Room too." : ".")); } }));

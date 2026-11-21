@@ -60,7 +60,7 @@
       items: [
         ["Words", "The whole book as it stands, with a bar toward its word target."],
         ["This month", "Words written on this book this month. Days where you cut more than you wrote count as zero, so editing never drags you below nothing."],
-        ["Your month", "Everything you've written this month across all your books, against your monthly goal."],
+        ["All books, this month", "Everything you've written this month across all your books, against your monthly goal."],
         ["Per month", "This book's average since it started."],
         ["Book speed", "How many months your finished books took on average, and how long this one has been going."],
         ["Pace and monthly goal", "Pace is words per hour, with the hours left to reach the book's target. Set it and your monthly goal in Settings ▸ Writers. It's the same pace as the Lamp Room's Settings, so changing one changes both."],

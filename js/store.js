@@ -167,6 +167,14 @@ The style checker's extra tells, budgets and ignored lines for this genre live b
           const b = JSON.parse(f.text); b.folder = name; this.books.push(b);
         } catch (e) { console.warn("Couldn't read", name, e); }
       }
+      // a book whose writer no longer exists (the writer was renamed): with only one writer, it's theirs
+      const ws = (this.settings.writers || []).map(w => w.name);
+      if (ws.length === 1) for (const b of this.books) if (b.writer !== ws[0]) { b.writer = ws[0]; try { await this.saveBook(b); } catch (e) { } }
+    },
+    async renameWriter(from, to) {
+      if (!from || !to || from === to) return 0;
+      let n = 0; for (const b of this.books) if (b.writer === from) { b.writer = to; await this.saveBook(b); n++; }
+      return n;
     },
     byFolder(f) { return this.books.find(b => b.folder === f); },
     async bookDir(book, create) { return dirAt(this.root, ["Books", book.folder], create); },
